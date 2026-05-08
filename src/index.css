@@ -201,17 +201,78 @@ body {
 .react-flow__controls-button:hover { background: var(--color-surface-muted); }
 
 /* =====================================================================
-   Base interaction styles
+   Cursor system — comprehensive pass.
+   The :hover-target principle: cursor matches the action you'd take
+   if you click/drag/grab/type at this element.
    ===================================================================== */
 
+/* Pointer for anything that triggers an action on click. */
 button:not(:disabled),
-[role="button"]:not(:disabled) {
+[role="button"]:not(:disabled),
+a,
+label[for],
+summary,
+select,
+[data-clickable="true"] {
   cursor: pointer;
 }
 
-button:disabled {
+button:disabled,
+[aria-disabled="true"] {
   cursor: not-allowed;
 }
+
+/* Text cursor for typeable inputs (browsers usually do this, but explicit
+   helps when inputs are nested inside flex containers with parent cursors). */
+input[type="text"],
+input[type="search"],
+input[type="email"],
+input[type="url"],
+input[type="number"],
+input[type="password"],
+input[type="tel"],
+input:not([type]),
+textarea,
+[contenteditable="true"] {
+  cursor: text;
+}
+
+/* Drag affordances. Static = grab; while pressed = grabbing. */
+[draggable="true"] {
+  cursor: grab;
+}
+[draggable="true"]:active,
+.cursor-grabbing,
+[data-dragging="true"] {
+  cursor: grabbing;
+}
+
+/* Range / slider inputs */
+input[type="range"] {
+  cursor: ew-resize;
+}
+
+/* Resize splitters / column dividers */
+.cursor-col-resize,
+[data-resize="x"] {
+  cursor: col-resize;
+}
+.cursor-row-resize,
+[data-resize="y"] {
+  cursor: row-resize;
+}
+
+/* Helper utilities — apply directly when needed */
+.cursor-grab          { cursor: grab; }
+.cursor-grab:active   { cursor: grabbing; }
+.cursor-pointer       { cursor: pointer; }
+.cursor-text          { cursor: text; }
+.cursor-not-allowed   { cursor: not-allowed; }
+.cursor-default       { cursor: default; }
+.cursor-crosshair     { cursor: crosshair; }
+.cursor-move          { cursor: move; }
+.cursor-zoom-in       { cursor: zoom-in; }
+.cursor-zoom-out      { cursor: zoom-out; }
 
 /* Prevent unwanted text selection during canvas drag */
 .no-select,

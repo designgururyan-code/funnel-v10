@@ -82,6 +82,12 @@ const Maximize     = I(<><polyline points="15 3 21 3 21 9"/><polyline points="9 
 const Minus        = I(<line x1="5" y1="12" x2="19" y2="12"/>);
 const ZoomIn       = I(<><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></>);
 const ZoomOut      = I(<><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></>);
+const TrendingUp   = I(<><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></>);
+const DollarSign   = I(<><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></>);
+const Image        = I(<><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></>);
+const HomeIcon     = I(<><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></>);
+const PlayIcon     = I(<polygon points="5 3 19 12 5 21 5 3"/>);
+const GiftIcon     = I(<><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></>);
 const FacebookIcon = ({size=14}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M22 12c0-5.52-4.48-10-10-10S2 6.48 2 12c0 4.84 3.44 8.87 8 9.8V15H8v-3h2V9.5C10 7.57 11.57 6 13.5 6H16v3h-2c-.55 0-1 .45-1 1v2h3v3h-3v6.95c5.05-.5 9-4.76 9-9.95z"/></svg>;
 const YoutubeIcon  = ({size=14}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1c.5-1.9.5-5.8.5-5.8s0-3.9-.5-5.8zM9.5 15.6V8.4L15.8 12l-6.3 3.6z"/></svg>;
 const InstaIcon    = I(<><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><circle cx="17.5" cy="6.5" r=".5" fill="currentColor"/></>);
@@ -361,6 +367,7 @@ function ContextBar({ funnel, onFunnelChange, mode }) {
   const [statusOpen, setStatusOpen] = useState(false);
   const [kebabOpen, setKebabOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
+  const [funnelAction, setFunnelAction] = useState(null); // 'rename'|'duplicate'|'delete'|'settings'|null
   const funAnchor = useRef(null);
   const statusAnchor = useRef(null);
   const kebabAnchor = useRef(null);
@@ -437,14 +444,109 @@ function ContextBar({ funnel, onFunnelChange, mode }) {
           </button>
         </Tip>
         <Popover anchorRef={kebabAnchor} open={kebabOpen} onClose={() => setKebabOpen(false)} width={200} align="end">
-          <MenuItem icon={<Edit         size={13}/>} label="Rename funnel"     onClick={() => setKebabOpen(false)}/>
-          <MenuItem icon={<Copy         size={13}/>} label="Duplicate funnel"  onClick={() => setKebabOpen(false)}/>
-          <MenuItem icon={<ExternalLink size={13}/>} label="Copy live URL"     onClick={() => setKebabOpen(false)}/>
+          <MenuItem icon={<Edit         size={13}/>} label="Rename funnel"     onClick={() => { setKebabOpen(false); setFunnelAction('rename'); }}/>
+          <MenuItem icon={<Copy         size={13}/>} label="Duplicate funnel"  onClick={() => { setKebabOpen(false); setFunnelAction('duplicate'); }}/>
+          <MenuItem icon={<ExternalLink size={13}/>} label="Copy live URL"     onClick={() => { setKebabOpen(false); navigator.clipboard?.writeText(`${funnel.name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')}.estage.com`); }}/>
           <MenuDivider/>
-          <MenuItem icon={<Cog          size={13}/>} label="Funnel settings"   onClick={() => setKebabOpen(false)}/>
+          <MenuItem icon={<Cog          size={13}/>} label="Funnel settings"   onClick={() => { setKebabOpen(false); setFunnelAction('settings'); }}/>
           <MenuDivider/>
-          <MenuItem icon={<Trash        size={13}/>} label="Delete funnel"     danger onClick={() => setKebabOpen(false)}/>
+          <MenuItem icon={<Trash        size={13}/>} label="Delete funnel"     danger onClick={() => { setKebabOpen(false); setFunnelAction('delete'); }}/>
         </Popover>
+      </div>
+      {funnelAction && <FunnelActionModal action={funnelAction} funnel={funnel} onClose={() => setFunnelAction(null)} onConfirm={(payload) => {
+        if (funnelAction === 'rename'    && payload?.name) onFunnelChange({ ...funnel, name: payload.name });
+        if (funnelAction === 'duplicate' && payload?.name) onFunnelChange({ ...funnel, id: 'f-' + Date.now(), name: payload.name });
+        // 'delete' is destructive; for the demo we leave the funnel in place but log.
+        if (funnelAction === 'delete') console.log('[ContextBar] delete funnel', funnel.id);
+        setFunnelAction(null);
+      }}/>}
+    </div>
+  );
+}
+
+/* FunnelActionModal — Rename / Duplicate / Delete / Settings (matches TemplateModal styling) */
+function FunnelActionModal({ action, funnel, onClose, onConfirm }) {
+  const [name, setName] = useState(action === 'duplicate' ? `Copy of ${funnel.name}` : funnel.name);
+  const isDelete = action === 'delete';
+  const isSettings = action === 'settings';
+  const titleMap = {
+    rename:    'Rename funnel',
+    duplicate: 'Duplicate funnel',
+    delete:    'Delete funnel',
+    settings:  'Funnel settings',
+  };
+  const ctaMap = {
+    rename:    'Save',
+    duplicate: 'Duplicate',
+    delete:    'Delete',
+    settings:  'Done',
+  };
+  const handleConfirm = () => onConfirm(isDelete || isSettings ? {} : { name });
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center modal-backdrop" style={{ background: 'rgba(15,23,42,0.45)' }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()}
+        className="modal-card w-[440px] max-w-[92vw] bg-white rounded-xl shadow-modal border border-line overflow-hidden">
+        <div className="px-5 pt-4 pb-3 flex items-center justify-between border-b border-line-soft">
+          <div className="flex items-center gap-2">
+            {isDelete && <span className="w-7 h-7 rounded-md bg-bad-soft text-bad-deep inline-flex items-center justify-center"><Trash size={14}/></span>}
+            {action === 'rename'    && <span className="w-7 h-7 rounded-md bg-brand-soft text-brand inline-flex items-center justify-center"><Edit size={14}/></span>}
+            {action === 'duplicate' && <span className="w-7 h-7 rounded-md bg-brand-soft text-brand inline-flex items-center justify-center"><Copy size={14}/></span>}
+            {isSettings && <span className="w-7 h-7 rounded-md bg-brand-soft text-brand inline-flex items-center justify-center"><Cog size={14}/></span>}
+            <h3 className="text-[14px] font-semibold text-ink">{titleMap[action]}</h3>
+          </div>
+          <button onClick={onClose} className="text-ink-soft hover:text-ink transition-colors"><X size={14}/></button>
+        </div>
+        <div className="px-5 py-4">
+          {action === 'rename' && (
+            <div>
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-ink-soft block mb-1.5">Funnel name</label>
+              <input value={name} autoFocus onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleConfirm(); }}
+                className="w-full h-9 px-3 text-[13px] text-ink bg-surface-sub border border-line-soft rounded-md outline-none focus:border-brand focus:ring-2 focus:ring-brand-soft transition-colors"/>
+            </div>
+          )}
+          {action === 'duplicate' && (
+            <div>
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-ink-soft block mb-1.5">Duplicate as</label>
+              <input value={name} autoFocus onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleConfirm(); }}
+                className="w-full h-9 px-3 text-[13px] text-ink bg-surface-sub border border-line-soft rounded-md outline-none focus:border-brand focus:ring-2 focus:ring-brand-soft transition-colors"/>
+              <p className="text-[11.5px] text-ink-soft mt-2">A copy will be created. All pages, sources, and analytics start fresh.</p>
+            </div>
+          )}
+          {isDelete && (
+            <div>
+              <p className="text-[13px] text-ink leading-snug">Delete <span className="font-semibold">{funnel.name}</span>?</p>
+              <p className="text-[11.5px] text-ink-soft mt-2 leading-snug">This will permanently remove the funnel, its pages, and all associated analytics. This action cannot be undone.</p>
+            </div>
+          )}
+          {isSettings && (
+            <div className="space-y-3">
+              <Field label="Tracking">
+                <Toggle label="Track conversions" defaultOn/>
+                <Toggle label="Send to analytics" defaultOn/>
+              </Field>
+              <Field label="Visibility">
+                <Toggle label="Indexable in search" />
+                <Toggle label="Public preview link" defaultOn/>
+              </Field>
+              <Field label="Domain">
+                <input defaultValue={`${funnel.name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')}.estage.com`}
+                  className="w-full h-8 px-2.5 text-[12px] text-ink bg-surface-sub border border-line-soft rounded-md outline-none focus:border-brand font-mono"/>
+              </Field>
+            </div>
+          )}
+        </div>
+        <div className="px-5 py-3 bg-surface-sub border-t border-line-soft flex items-center justify-end gap-2">
+          <button onClick={onClose}
+            className="h-8 px-3 inline-flex items-center text-[12px] font-medium text-ink-muted bg-white border border-line rounded-md hover:bg-surface-muted hover:text-ink transition-colors">
+            Cancel
+          </button>
+          <button onClick={handleConfirm}
+            className={`h-8 px-3.5 inline-flex items-center text-[12px] font-semibold text-white rounded-md transition-colors ${
+              isDelete ? 'bg-bad hover:bg-bad-deep' : 'bg-genesis hover:bg-genesis-hover'
+            }`}>
+            {ctaMap[action]}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -675,7 +777,7 @@ function TemplateModal({ template, onClose, onConfirm }) {
   );
 }
 
-function Sidebar({ onAIClick, collapsed, onToggleCollapsed, focusSection, onFocusSection, onTemplateClick }) {
+function Sidebar({ onAIClick, collapsed, onToggleCollapsed, focusSection, onFocusSection, onTemplateClick, canvasApi }) {
   const [open, setOpen] = useState({ pages:true, inFunnel:false, sources:true, templates:false });
   const [folder, setFolder] = useState('root');
   const [search, setSearch] = useState('');
@@ -709,7 +811,10 @@ function Sidebar({ onAIClick, collapsed, onToggleCollapsed, focusSection, onFocu
         { label:'Rename',           icon:<Edit         size={14}/>, action: () => {} },
         { label:'Duplicate',        icon:<Copy         size={14}/>, action: () => {} },
         { divider:true },
-        { label:'Delete page',      icon:<Trash        size={14}/>, action: () => {}, danger:true },
+        { label:'Delete page',      icon:<Trash        size={14}/>, action: () => {
+          // Remove from canvas (if present) by matching title.
+          canvasApi?.current?.removeNodeByTitle(page.title);
+        }, danger:true },
       ]
     });
   };
@@ -774,9 +879,12 @@ function Sidebar({ onAIClick, collapsed, onToggleCollapsed, focusSection, onFocu
       <div className="px-3 py-2.5 border-b border-line-soft shrink-0 flex items-center gap-2">
         <span className="text-[10.5px] font-semibold tracking-wider uppercase text-ink-soft">Quick add</span>
         <div className="flex-1"/>
-        <QuickIcon Icon={Globe}    color="#10B981" tint="#ECFDF5" tintHover="#D1FAE5" label="Add traffic source"/>
-        <QuickIcon Icon={FileIcon} color="#006CB5" tint="#E6F0F9" tintHover="#CCE0F1" label="Add page"/>
-        <QuickIcon Icon={Cart}     color="#7C3AED" tint="#F3EEFF" tintHover="#E9DEFF" label="Add checkout"/>
+        <QuickIcon Icon={Globe}    color="#10B981" tint="#ECFDF5" tintHover="#D1FAE5" label="Add traffic source"
+          onClick={() => canvasApi?.current?.addNode({ type:'source', data:{ src:'fb', visitorsNum:0 } })}/>
+        <QuickIcon Icon={FileIcon} color="#006CB5" tint="#E6F0F9" tintHover="#CCE0F1" label="Add page"
+          onClick={() => canvasApi?.current?.addNode({ type:'page',   data:{ title:'New page', path:'/new', kind:'landing' } })}/>
+        <QuickIcon Icon={Cart}     color="#7C3AED" tint="#F3EEFF" tintHover="#E9DEFF" label="Add checkout"
+          onClick={() => canvasApi?.current?.addNode({ type:'page',   data:{ title:'Checkout', path:'/checkout', kind:'checkout' } })}/>
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto scroll-thin">
@@ -864,11 +972,11 @@ function Section({ title, count, open, onToggle, children, last }) {
   );
 }
 
-function QuickIcon({ Icon, color, tint, tintHover, label }) {
+function QuickIcon({ Icon, color, tint, tintHover, label, onClick }) {
   const [hover, setHover] = useState(false);
   return (
     <Tip label={label} side="bottom">
-      <button onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      <button onClick={onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
         className="w-7 h-7 inline-flex items-center justify-center rounded-md transition-colors"
         style={{ background: hover ? tintHover : tint, color }}>
         <Icon size={14}/>
@@ -2184,8 +2292,31 @@ function Canvas({ mode, demoState, onDemoStateChange, onJumpToTemplates, onJumpT
         setSelected(newId);
       },
       deselect:       () => setSelected(null),
+      addNode:        ({ type, data, x, y }) => {
+        const newId = (type || 'page') + '-' + Date.now();
+        // Center of current visible canvas (compensate pan/zoom)
+        const cx = x != null ? x : (-pan.x + 400) / zoom;
+        const cy = y != null ? y : (-pan.y + 200) / zoom;
+        const def = type === 'source'
+          ? { src: 'fb', visitorsNum: 0 }
+          : type === 'logic'
+            ? { kind: 'condition', title: 'Untitled condition' }
+            : { title: 'New page', path: '/new', kind: 'landing' };
+        const node = { id: newId, type: type || 'page', x: cx, y: cy, data: { ...def, ...(data || {}) } };
+        setNodes(ns => [...ns, node]);
+        setSelected(newId);
+      },
+      removeNodeByTitle: (title) => {
+        setNodes(ns => {
+          const match = ns.find(n => n.data && n.data.title === title);
+          if (!match) return ns;
+          setEdges(es => es.filter(e => e.from !== match.id && e.to !== match.id));
+          setSelected(s => s === match.id ? null : s);
+          return ns.filter(n => n.id !== match.id);
+        });
+      },
     };
-  }, [canvasApiRef, nodes]);
+  }, [canvasApiRef, nodes, pan, zoom]);
 
   /* derive source → target lookup for source-card "To Landing X%" rendering.
      Includes count of outgoing edges so the card can switch UI for 0 / 1 / 2+ cases. */
@@ -2983,8 +3114,26 @@ function DetailsSource({ node, api, mode }) {
   const s = SOURCES.find(p => p.id === node.data.src) || SOURCES[0];
   const visitors = node.data.visitorsNum || 0;
   const cpl = node.data.cpl != null ? '$' + node.data.cpl.toFixed(2) : '—';
+  // Default to connected so existing demo sources show real performance data.
+  const connected = node.data.connected !== false;
   return (
     <div className="px-4 py-3 space-y-4">
+      <InspSection label="Connection">
+        <div className="flex items-center gap-2 px-2.5 py-2 bg-surface-sub border border-line-soft rounded-md">
+          <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-good live-dot' : 'bg-ink-soft'}`}/>
+          <span className="text-[11.5px] text-ink font-medium">{connected ? 'Connected' : 'Not connected'}</span>
+          <span className="flex-1"/>
+          <button onClick={() => api.updateNodeData(node.id, { connected: !connected })}
+            className={`h-7 px-2.5 text-[11px] font-semibold rounded transition-colors ${
+              connected
+                ? 'text-bad-deep bg-white border border-line hover:bg-bad-soft hover:border-bad'
+                : 'text-white bg-genesis hover:bg-genesis-hover'
+            }`}>
+            {connected ? 'Disconnect' : 'Connect'}
+          </button>
+        </div>
+      </InspSection>
+
       <InspSection label="Performance">
         <Stat label="Visitors (7d)" value={visitors.toLocaleString()}/>
         <Stat label="Sessions" value={Math.round(visitors * 1.18).toLocaleString()}/>
@@ -3017,20 +3166,50 @@ function DetailsSource({ node, api, mode }) {
 /* LOGIC DETAILS — Condition rule builder OR A/B Test split slider */
 function DetailsLogic({ node, api }) {
   const isAB = node.data.kind === 'abtest';
+  const yLabel = node.data.yesLabel != null ? node.data.yesLabel : (isAB ? 'Variant A' : 'If condition is true');
+  const nLabel = node.data.noLabel  != null ? node.data.noLabel  : (isAB ? 'Variant B' : 'If condition is false');
+  const title  = node.data.title    != null ? node.data.title    : (isAB ? 'Untitled A/B test' : 'Untitled condition');
   return (
     <div className="px-4 py-3 space-y-4">
+      <InspSection label={isAB ? 'Test name' : 'Condition name'}>
+        <input value={title} onChange={(e) => api.updateNodeData(node.id, { title: e.target.value })}
+          placeholder={isAB ? 'Untitled A/B test' : 'Untitled condition'}
+          className="w-full h-7 px-2 text-[11.5px] text-ink bg-surface-sub border border-line-soft rounded outline-none focus:border-brand"/>
+      </InspSection>
+
       {!isAB && <ConditionRuleBuilder node={node} api={api}/>}
       {isAB  && <ABTestSplitSlider node={node} api={api}/>}
 
       <InspSection label="Branches">
-        <BranchRow letter={isAB ? 'A' : 'Y'} color={isAB ? '#7C3AED' : '#10B981'} label={isAB ? 'Variant A' : 'If condition is true'}/>
-        <BranchRow letter={isAB ? 'B' : 'N'} color={isAB ? '#F59E0B' : '#94A3B8'} label={isAB ? 'Variant B' : 'If condition is false'}/>
+        <EditableBranchRow
+          letter={isAB ? 'A' : 'Y'}
+          color={isAB ? '#7C3AED' : '#10B981'}
+          value={yLabel}
+          onChange={(v) => api.updateNodeData(node.id, { yesLabel: v })}/>
+        <EditableBranchRow
+          letter={isAB ? 'B' : 'N'}
+          color={isAB ? '#F59E0B' : '#94A3B8'}
+          value={nLabel}
+          onChange={(v) => api.updateNodeData(node.id, { noLabel: v })}/>
       </InspSection>
 
       <InspSection label="Actions">
         <ActionButton icon={<Copy size={11}/>}        label="Duplicate" onClick={() => api.duplicateNode(node.id)}/>
         <ActionButton icon={<X size={11}/>}           label="Remove"   destructive onClick={() => api.removeNode(node.id)}/>
       </InspSection>
+    </div>
+  );
+}
+
+/* EditableBranchRow — branch letter + inline-editable label. Letters stay
+   tied to edge-badge color identity (Y/N/A/B); only the description is editable. */
+function EditableBranchRow({ letter, color, value, onChange }) {
+  return (
+    <div className="flex items-center gap-2 px-2 py-1.5 rounded bg-surface-sub border border-line-soft">
+      <span className="w-5 h-5 inline-flex items-center justify-center rounded text-[10px] font-bold text-white shrink-0"
+        style={{ background: color }}>{letter}</span>
+      <input value={value} onChange={(e) => onChange(e.target.value)}
+        className="flex-1 min-w-0 h-6 px-1.5 text-[11.5px] text-ink bg-transparent border-0 outline-none focus:bg-white focus:border focus:border-brand rounded"/>
     </div>
   );
 }
@@ -3120,6 +3299,11 @@ function InspectorLeads({ node }) {
 /* InspectorSettings — V6 stub for now */
 function InspectorSettings({ node, api }) {
   const title = node.data.title || '';
+  const isPage = node.type === 'page';
+  const PAGE_ICONS = ['file', 'home', 'cart', 'check', 'mail', 'video', 'star', 'gift'];
+  const PAGE_COLORS = ['#006CB5', '#10B981', '#7C3AED', '#F59E0B', '#DC2626', '#475569', '#0891B2', '#EC4899'];
+  const currentIcon  = node.data.icon  || 'file';
+  const currentColor = node.data.color || '#006CB5';
   return (
     <div className="px-4 py-3 space-y-4">
       <InspSection label="General">
@@ -3127,7 +3311,7 @@ function InspectorSettings({ node, api }) {
           <input value={title} onChange={(e) => api.updateNodeData(node.id, { title: e.target.value })}
             className="w-full h-7 px-2 text-[11.5px] text-ink bg-surface-sub border border-line-soft rounded outline-none focus:border-brand"/>
         </Field>
-        {node.type === 'page' && (
+        {isPage && (
           <Field label="URL slug">
             <div className="flex items-center gap-1">
               <span className="text-[11px] text-ink-soft">/</span>
@@ -3137,6 +3321,49 @@ function InspectorSettings({ node, api }) {
           </Field>
         )}
       </InspSection>
+
+      {isPage && (
+        <InspSection label="Appearance">
+          <Field label="Icon">
+            <div className="grid grid-cols-8 gap-1">
+              {PAGE_ICONS.map(ic => (
+                <button key={ic} onClick={() => api.updateNodeData(node.id, { icon: ic })}
+                  className={`w-7 h-7 inline-flex items-center justify-center rounded-md border transition-colors ${
+                    currentIcon === ic
+                      ? 'border-brand bg-brand-soft text-brand'
+                      : 'border-line-soft text-ink-muted hover:bg-surface-muted hover:text-ink'
+                  }`}>
+                  {ic === 'file'  && <FileIcon size={12}/>}
+                  {ic === 'home'  && <HomeIcon size={12}/>}
+                  {ic === 'cart'  && <Cart size={12}/>}
+                  {ic === 'check' && <Check size={12}/>}
+                  {ic === 'mail'  && <Mail size={12}/>}
+                  {ic === 'video' && <PlayIcon size={12}/>}
+                  {ic === 'star'  && <StarIcon size={12}/>}
+                  {ic === 'gift'  && <GiftIcon size={12}/>}
+                </button>
+              ))}
+            </div>
+          </Field>
+          <Field label="Color">
+            <div className="grid grid-cols-8 gap-1">
+              {PAGE_COLORS.map(c => (
+                <button key={c} onClick={() => api.updateNodeData(node.id, { color: c })}
+                  className={`w-7 h-7 rounded-md border-2 transition-transform hover:scale-105 ${
+                    currentColor === c ? 'border-ink ring-2 ring-brand-soft' : 'border-white shadow-xs'
+                  }`}
+                  style={{ background: c }}/>
+              ))}
+            </div>
+          </Field>
+          <Field label="Screenshot URL">
+            <input value={node.data.screenshot || ''} onChange={(e) => api.updateNodeData(node.id, { screenshot: e.target.value })}
+              placeholder="https://… or leave empty for wireframe"
+              className="w-full h-7 px-2 text-[11.5px] text-ink bg-surface-sub border border-line-soft rounded outline-none focus:border-brand"/>
+          </Field>
+        </InspSection>
+      )}
+
       <InspSection label="Tracking">
         <Toggle label="Track conversions" defaultOn/>
         <Toggle label="Send to analytics" defaultOn/>
@@ -3250,20 +3477,77 @@ function SuggestedWin({ title, body, impact, cta }) {
   );
 }
 
-function InspectorEmpty() {
+function InspectorEmpty({ funnel }) {
+  /* Empty-state Inspector: shown when no canvas card is selected.
+     Acts as funnel-level overview — analytics summary + activity feed.
+     Updates whenever the user clicks empty space (deselects). */
+  const stats = [
+    { label: 'Visits',    value: '3,214', delta: '+12%', good: true,  Icon: Globe },
+    { label: 'Submits',   value: '271',   delta: '+8%',  good: true,  Icon: Check },
+    { label: 'Conv',      value: '8.4%',  delta: '−2.1%',good: false, Icon: TrendingUp },
+    { label: 'Revenue',   value: '$2.9k', delta: '+18%', good: true,  Icon: DollarSign },
+  ];
+  const activity = [
+    { color: '#10B981', icon: <Check    size={11}/>, text: <>Funnel <span className="font-medium">published</span></>,                                           time: '2m ago' },
+    { color: '#EA4335', icon: <Mail     size={11}/>, text: <>New email step added to <span className="font-medium">Lead form</span></>,                          time: '24m ago' },
+    { color: '#1877F2', icon: <Globe    size={11}/>, text: <><span className="font-medium">Facebook</span> source connected</>,                                  time: '1h ago' },
+    { color: '#7C3AED', icon: <Sparkles size={11}/>, text: <>Suggestion: <span className="font-medium">A/B test the headline</span></>,                          time: '3h ago' },
+    { color: '#006CB5', icon: <FileIcon size={11}/>, text: <>Landing page edited</>,                                                                             time: '1d ago' },
+    { color: '#F59E0B', icon: <Edit     size={11}/>, text: <>Renamed step from <span className="font-medium">Step 2</span> to <span className="font-medium">Lead Magnet</span></>, time: '2d ago' },
+    { color: '#10B981', icon: <Plus     size={11}/>, text: <>Added <span className="font-medium">Welcome email</span> to sequence</>,                            time: '3d ago' },
+  ];
   return (
     <aside className="w-[320px] border-l border-line bg-white flex flex-col shrink-0">
-      <div className="px-4 py-3 border-b border-line-soft">
-        <div className="text-[10.5px] font-semibold uppercase tracking-wider text-ink-soft">Inspector</div>
-      </div>
-      <div className="flex-1 flex items-center justify-center px-6">
-        <div className="text-center">
-          <div className="w-10 h-10 rounded-full bg-surface-sub mx-auto mb-3 inline-flex items-center justify-center">
-            <Workflow size={14} className="text-ink-soft"/>
-          </div>
-          <div className="text-[12px] font-semibold text-ink mb-1">Nothing selected</div>
-          <div className="text-[11.5px] text-ink-soft leading-relaxed">Click a card on the canvas to inspect it.</div>
+      {/* Header */}
+      <div className="px-4 py-3 border-b border-line-soft shrink-0">
+        <div className="text-[10.5px] font-semibold uppercase tracking-wider text-ink-soft">Funnel overview</div>
+        <div className="text-[13px] font-semibold text-ink mt-0.5 truncate">{funnel?.name || 'Untitled funnel'}</div>
+        <div className="text-[10.5px] text-ink-soft mt-0.5 inline-flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-good live-dot"/> Last 7 days
         </div>
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-y-auto scroll-thin">
+        {/* Stats grid (2x2) */}
+        <div className="px-4 py-3 grid grid-cols-2 gap-2">
+          {stats.map((s, i) => (
+            <div key={i} className="bg-surface-sub border border-line-soft rounded-md px-2.5 py-2">
+              <div className="flex items-center justify-between">
+                <s.Icon size={12} className="text-ink-soft"/>
+                <span className={`text-[10px] font-semibold tabular-nums ${s.good ? 'text-good-deep' : 'text-bad-deep'}`}>{s.delta}</span>
+              </div>
+              <div className="text-[15px] font-semibold text-ink tabular-nums mt-1">{s.value}</div>
+              <div className="text-[10.5px] text-ink-soft mt-0.5">{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Activity feed */}
+        <div className="border-t border-line-soft">
+          <div className="px-4 py-2.5 flex items-center justify-between">
+            <div className="text-[10.5px] font-semibold uppercase tracking-wider text-ink-soft">Activity</div>
+            <button className="text-[10.5px] text-brand font-medium hover:underline">View all</button>
+          </div>
+          <div className="pb-2">
+            {activity.map((a, i) => (
+              <div key={i} className="flex items-start gap-2.5 px-4 py-2 hover:bg-surface-sub transition-colors">
+                <span className="w-[22px] h-[22px] rounded-md flex items-center justify-center shrink-0 mt-px"
+                  style={{ background: a.color + '1a', color: a.color }}>
+                  {a.icon}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[12px] text-ink leading-snug">{a.text}</div>
+                  <div className="text-[10.5px] text-ink-soft mt-0.5">{a.time}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Footer hint */}
+      <div className="border-t border-line-soft px-4 py-2.5 shrink-0 bg-surface-sub">
+        <div className="text-[10.5px] text-ink-soft">Click a card on the canvas to inspect it.</div>
       </div>
     </aside>
   );
@@ -3295,7 +3579,8 @@ export default function App() {
           onToggleCollapsed={() => setCollapsed(c => !c)}
           focusSection={focusSection}
           onFocusSection={setFocusSection}
-          onTemplateClick={setTemplateModal}/>
+          onTemplateClick={setTemplateModal}
+          canvasApi={canvasApi}/>
         <Canvas
           mode={mode}
           demoState={demoState}
@@ -3306,7 +3591,7 @@ export default function App() {
           canvasApiRef={canvasApi}/>
         {selectedNode
           ? <Inspector node={selectedNode} api={canvasApi.current || {}} mode={mode}/>
-          : <InspectorEmpty/>}
+          : <InspectorEmpty funnel={funnel}/>}
       </div>
       <AIPopover open={aiOpen} onClose={() => setAiOpen(false)}/>
       <TemplateModal template={templateModal} onClose={() => setTemplateModal(null)} onConfirm={() => {}}/>
