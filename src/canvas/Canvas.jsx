@@ -189,14 +189,36 @@ function CanvasInner({
         label: orig.data?.label || null,
       },
     };
-    const outEdge = {
-      id: `e-${id}-${orig.target}-${Date.now() + 1}`,
+    // Both branches auto-connect to the original target so the Y and N
+    // (or A and B) lines are visible immediately — the user can then drag
+    // the secondary branch off to a different destination. Splitting the
+    // volume in half is a sensible default for the A/B kind; for a
+    // Condition we leave the primary at the full volume and the secondary
+    // at zero (no traffic taking the No path until the rule fires).
+    const isAB = kind === 'abtest';
+    const primaryVolume = isAB
+      ? Math.round((orig.data?.volume || 0) / 2)
+      : (orig.data?.volume || 0);
+    const secondaryVolume = isAB
+      ? Math.max(0, (orig.data?.volume || 0) - primaryVolume)
+      : 0;
+    const outEdgePrimary = {
+      id: `e-${id}-${orig.target}-${Date.now() + 1}-yes`,
       source: id,
       target: orig.target,
       type: 'pathStats',
       sourceHandle: k.primaryBranch,
       targetHandle: 'in',
-      data: { volume: orig.data?.volume || 0, branch: k.primaryBranch, label: null },
+      data: { volume: primaryVolume, branch: k.primaryBranch, label: null },
+    };
+    const outEdgeSecondary = {
+      id: `e-${id}-${orig.target}-${Date.now() + 2}-no`,
+      source: id,
+      target: orig.target,
+      type: 'pathStats',
+      sourceHandle: k.secondaryBranch,
+      targetHandle: 'in',
+      data: { volume: secondaryVolume, branch: k.secondaryBranch, label: null },
     };
 
     // Apply both updates as siblings — React batches them in event handlers,
@@ -208,7 +230,7 @@ function CanvasInner({
       const idx = es.findIndex((e) => e.id === edgeId);
       if (idx === -1) return es;
       const next = [...es];
-      next.splice(idx, 1, inEdge, outEdge);
+      next.splice(idx, 1, inEdge, outEdgePrimary, outEdgeSecondary);
       return next;
     });
     setSelectedNodeId(null);
