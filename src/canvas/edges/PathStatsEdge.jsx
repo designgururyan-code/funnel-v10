@@ -132,9 +132,14 @@ export default function PathStatsEdge({
   const rate = fromVisitors ? Math.round((vol / fromVisitors) * 100) : null;
   const showStats = mode === 'analyse' && vol > 0;
 
-  // Branch badge sits ~85% along the path.
-  const bx = sourceX + (targetX - sourceX) * 0.85;
-  const by = sourceY + (targetY - sourceY) * 0.85;
+  // Branch badge sits on the actual smoothstep path near the destination.
+  // Smoothstep enters the target horizontally from the left for our L→R flow,
+  // so positioning at (targetX - 26, targetY) puts the badge on the final
+  // horizontal segment, just before the arrow tip. The previous 85%
+  // interpolation followed a straight line between source/target which
+  // floated the badge off the L-shaped path.
+  const bx = targetX - 26;
+  const by = targetY;
   const meta = branchMeta(branch);
 
   // Path-stats popover content (rendered when statsOpen)

@@ -154,49 +154,62 @@ function CanvasInner({
   const insertLogicNode = useCallback((kind) => {
     if (!insertPicker) return;
     const { edgeId, worldX, worldY } = insertPicker;
-    setEdges((currEdges) => {
-      const orig = currEdges.find((e) => e.id === edgeId);
-      if (!orig) return currEdges;
-      const id = 'logic-' + Date.now();
-      const w = NODE_W.logic, h = NODE_H.logic;
-      const newNode = {
-        id,
-        type: 'logic',
-        position: { x: worldX - w / 2, y: worldY - h / 2 },
-        data: {
-          kind,
-          title: kind === 'condition' ? 'Untitled condition' : 'Untitled A/B test',
-        },
-      };
-      const k = LOGIC_KIND[kind] || LOGIC_KIND.condition;
-      const inEdge = {
-        id: `e-${orig.source}-${id}-${Date.now()}`,
-        source: orig.source,
-        target: id,
-        type: 'pathStats',
-        sourceHandle: orig.sourceHandle,
-        data: { volume: orig.data?.volume || 0, branch: orig.data?.branch || null, label: orig.data?.label || null },
-      };
-      const outEdge = {
-        id: `e-${id}-${orig.target}-${Date.now() + 1}`,
-        source: id,
-        target: orig.target,
-        type: 'pathStats',
-        sourceHandle: k.primaryBranch,
-        data: { volume: orig.data?.volume || 0, branch: k.primaryBranch, label: null },
-      };
-      // splice: replace orig with [inEdge, outEdge]
-      const idx = currEdges.findIndex((e) => e.id === edgeId);
-      const next = [...currEdges];
+    const orig = edges.find((e) => e.id === edgeId);
+    if (!orig) { setInsertPicker(null); return; }
+
+    const id = 'logic-' + Date.now();
+    const w = NODE_W.logic, hLogic = NODE_H.logic;
+    const newNode = {
+      id,
+      type: 'logic',
+      position: { x: worldX - w / 2, y: worldY - hLogic / 2 },
+      data: {
+        kind,
+        title: kind === 'condition' ? 'Untitled condition' : 'Untitled A/B test',
+      },
+    };
+    const k = LOGIC_KIND[kind] || LOGIC_KIND.condition;
+    // inEdge inherits orig's sourceHandle. Only carry it through when the
+    // original source was a logic node — for page/source origins, the only
+    // valid source handle is the default (no id), and propagating a stale
+    // 'yes'/'no' would make xyflow drop the edge.
+    const origFromNode = nodes.find((n) => n.id === orig.source);
+    const inEdge = {
+      id: `e-${orig.source}-${id}-${Date.now()}`,
+      source: orig.source,
+      target: id,
+      type: 'pathStats',
+      data: {
+        volume: orig.data?.volume || 0,
+        branch: origFromNode?.type === 'logic' ? (orig.data?.branch || null) : null,
+        label: orig.data?.label || null,
+      },
+    };
+    if (origFromNode?.type === 'logic' && orig.sourceHandle) inEdge.sourceHandle = orig.sourceHandle;
+    const outEdge = {
+      id: `e-${id}-${orig.target}-${Date.now() + 1}`,
+      source: id,
+      target: orig.target,
+      type: 'pathStats',
+      sourceHandle: k.primaryBranch,
+      data: { volume: orig.data?.volume || 0, branch: k.primaryBranch, label: null },
+    };
+
+    // Apply both updates as siblings — React batches them in event handlers,
+    // so the next render sees both the new node and the new edges. Nesting
+    // setNodes inside a setEdges reducer triggers React StrictMode's
+    // double-invocation, which would add the same logic node twice.
+    setNodes((ns) => [...ns, newNode]);
+    setEdges((es) => {
+      const idx = es.findIndex((e) => e.id === edgeId);
+      if (idx === -1) return es;
+      const next = [...es];
       next.splice(idx, 1, inEdge, outEdge);
-      // also push the new node — do this in a nested setNodes (split here so
-      // both transitions land in one effect cycle)
-      setNodes((ns) => [...ns, newNode]);
       return next;
     });
     setSelectedNodeId(null);
     setInsertPicker(null);
-  }, [insertPicker, setEdges, setNodes]);
+  }, [insertPicker, edges, nodes, setEdges, setNodes]);
 
   const changeSource = useCallback((nodeId, newSrcId) => {
     setNodes((ns) =>
@@ -366,15 +379,21 @@ function CanvasInner({
         setEdges((es) => es.filter((_, i) => i !== idx)),
       addEdgeBranch: (idx, branch) =>
         setEdges((es) =>
-          es.map((e, i) =>
-            i === idx
-              ? {
-                  ...e,
-                  data: { ...(e.data || {}), branch },
-                  sourceHandle: branch || e.sourceHandle,
-                }
-              : e,
-          ),
+          es.map((e, i) => {
+            if (i !== idx) return e;
+            // Only re-route to a branch handle if the source is a logic node
+            // (which has 'yes'/'no'/'a'/'b' handles). For page/source
+            // origins, setting sourceHandle to a non-existent id makes xyflow
+            // drop the edge entirely. data.branch is still set so the Y/N/A/B
+            // badge renders near the destination — the branch becomes a
+            // visual marker, which matches the original Canvas's behaviour.
+            const fromNode = nodes.find((n) => n.id === e.source);
+            const next = { ...e, data: { ...(e.data || {}), branch } };
+            if (fromNode?.type === 'logic') {
+              next.sourceHandle = branch;
+            }
+            return next;
+          }),
         ),
       updateEdge: (idx, patch) =>
         setEdges((es) =>
