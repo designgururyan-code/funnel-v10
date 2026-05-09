@@ -476,43 +476,30 @@ function CanvasInner({
     setConnectFromId(null);
   }, []);
   const isValidConnection = useCallback((c) => {
-    // No self-loops, no same-pair dupes, no targeting a source node.
+    // Sources are entry points, can't receive. Self-loops don't make sense
+    // in a funnel. Anything else is fair game — including a second connection
+    // between the same pair when a logic node re-routes its secondary branch.
     if (c.source === c.target) return false;
     const targetNode = nodes.find((n) => n.id === c.target);
     if (targetNode?.type === 'source') return false;
-    if (edges.some((e) => e.source === c.source && e.target === c.target)) return false;
     return true;
-  }, [nodes, edges]);
+  }, [nodes]);
 
   // ───────────────────────── Connections ─────────────────────────
   // When user drags from a handle to another node's target handle, xyflow
   // calls onConnect with { source, target, sourceHandle, targetHandle }.
   const onConnect = useCallback(
     (params) => {
-      // For logic-node sources, override sourceHandle if the user happened to
-      // drag from the same handle twice — we want first connection = primary,
-      // second = secondary.
       const fromNode = nodes.find((n) => n.id === params.source);
       let sourceHandle = params.sourceHandle || 'out';
       let branch = null;
       if (fromNode?.type === 'logic') {
+        // Honour the handle the user actually grabbed — branch is fully
+        // identified by sourceHandle on logic nodes ('yes'/'no'/'a'/'b').
         const k = LOGIC_KIND[fromNode.data?.kind] || LOGIC_KIND.condition;
-        const outgoingFrom = edges.filter((e) => e.source === params.source);
-        if (outgoingFrom.length >= 2) return; // no third branch allowed
-        if (outgoingFrom.length === 0) {
-          sourceHandle = k.primaryBranch;
-          branch = k.primaryBranch;
-        } else {
-          // already have one — assign the missing branch to the new edge
-          const usedBranches = new Set(
-            outgoingFrom.map((e) => e.sourceHandle).filter(Boolean),
-          );
-          const candidate = !usedBranches.has(k.primaryBranch)
-            ? k.primaryBranch
-            : k.secondaryBranch;
-          sourceHandle = candidate;
-          branch = candidate;
-        }
+        const valid = [k.primaryBranch, k.secondaryBranch];
+        if (!valid.includes(sourceHandle)) sourceHandle = k.primaryBranch;
+        branch = sourceHandle;
       }
       // Default volume — half of source's visitorsNum if it's a source node.
       const defaultVolume =
@@ -520,9 +507,20 @@ function CanvasInner({
           ? Math.round((fromNode.data.visitorsNum || 1000) * 0.5)
           : 100;
       setEdges((es) => {
-        // dedupe — refuse a second edge between the same pair
-        if (es.find((e) => e.source === params.source && e.target === params.target))
+        // For logic-node sources, replace any existing edge from the same
+        // handle (yes/no/a/b → re-route). For page/source origins, allow
+        // multiple outgoing edges to different targets but dedupe on exact
+        // (source, target) pair so we don't stack identical lines.
+        let next = es;
+        if (fromNode?.type === 'logic') {
+          next = es.filter(
+            (e) => !(e.source === params.source && e.sourceHandle === sourceHandle),
+          );
+        } else if (
+          es.some((e) => e.source === params.source && e.target === params.target)
+        ) {
           return es;
+        }
         const newEdge = {
           id: `e-${params.source}-${params.target}-${Date.now()}`,
           source: params.source,
@@ -532,10 +530,10 @@ function CanvasInner({
           targetHandle: 'in',
           data: { volume: defaultVolume, branch, label: null },
         };
-        return [...es, newEdge];
+        return [...next, newEdge];
       });
     },
-    [nodes, edges, setEdges],
+    [nodes, setEdges],
   );
 
   // ───────────────────────── Drag-and-drop from sidebar ─────────────────────────
