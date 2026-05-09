@@ -3941,7 +3941,7 @@ function DetailsPage({ node, api, mode }) {
   const avgTime = node.data.avgTime || '1:48';
   const isAnalyse = mode === 'analyse';
   return (
-    <div className="px-4 py-3 space-y-4">
+    <div className="space-y-0">
       {/* Performance — mirrors the analyse-mode card stats so the
          right-panel reflects what's on the card 1:1. */}
       <InspSection label="Performance" right={isAnalyse ? <span className="text-[10px] text-ink-soft">In funnel</span> : null}>
@@ -4055,7 +4055,7 @@ function DetailsSource({ node, api, mode }) {
   const customColor = node.data.customColor || '#475569';
 
   return (
-    <div className="px-4 py-3 space-y-4">
+    <div className="space-y-0">
       {/* Type dropdown — switch between platform-connected and custom mode */}
       <InspSection label="Source type">
         <select value={node.data.src || 'fb'} onChange={(e) => api.updateNodeData(node.id, { src: e.target.value })}
@@ -4175,7 +4175,7 @@ function DetailsLogic({ node, api, mode }) {
   const nPct = total ? Math.round((nVol / total) * 100) : 0;
 
   return (
-    <div className="px-4 py-3 space-y-4">
+    <div className="space-y-0">
       <InspSection label={isAB ? 'Test name' : 'Condition name'}>
         <input value={title} onChange={(e) => api.updateNodeData(node.id, { title: e.target.value })}
           placeholder={isAB ? 'Untitled A/B test' : 'Untitled condition'}
@@ -4615,7 +4615,7 @@ function InspectorSettings({ node, api }) {
   const currentIcon  = node.data.icon  || 'file';
   const currentColor = node.data.color || '#006CB5';
   return (
-    <div className="px-4 py-3 space-y-4">
+    <div className="space-y-0">
       <InspSection label="General">
         {node.type !== 'logic' && (
           <Field label="Name">
@@ -4854,20 +4854,17 @@ function InspectorSettings({ node, api }) {
 
 /* ── Inspector primitives — small reusable bits ── */
 function InspSection({ label, right, children }) {
-  /* Adds a top border + padding so each Inspector section reads as a
-     distinct block (Performance, Details, Ad tracking, Traffic snapshot,
-     Actions, etc.). The first-of-type variant strips the top border so the
-     panel doesn't open with a redundant divider line — handled via CSS
-     `.insp-section:first-of-type { border-top: 0; padding-top: 0; }` (see
-     index.css). The fallback class names below give Tailwind the right rule
-     for everything from the second section onward. */
+  /* Matches the left-sidebar Section tab style: heading row sits in its own
+     band with a top + bottom border, content sits below in unbordered space.
+     The first section's top border is suppressed via :first-of-type CSS so
+     the panel doesn't double-up with the panel header. */
   return (
-    <div className="insp-section pt-4 mt-4 border-t border-line-soft">
-      <div className="flex items-center justify-between mb-2">
-        <div className="text-[10px] font-semibold uppercase tracking-wider text-ink-soft" style={{ letterSpacing: '0.07em' }}>{label}</div>
+    <div className="insp-section">
+      <div className="flex items-center justify-between px-3 py-2 border-y border-line-soft bg-surface-sub/40">
+        <div className="text-[10.5px] font-semibold uppercase tracking-wider text-ink-soft" style={{ letterSpacing: '0.07em' }}>{label}</div>
         {right}
       </div>
-      <div className="space-y-1.5">{children}</div>
+      <div className="px-3 py-3 space-y-1.5">{children}</div>
     </div>
   );
 }
@@ -4981,6 +4978,7 @@ function InspectorEmpty({ funnel, canvasNodes = [], mode = "build" }) {
   const [range, setRange]       = useState('7d');
   const [view,  setView]        = useState('basic'); // 'basic' | 'advanced'
   const [customRangeOpen, setCustomRangeOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(true);
 
   // Detect what's actually in the funnel — drives whether Advanced is unlockable.
   const pricedPages = useMemo(
@@ -5146,35 +5144,35 @@ function InspectorEmpty({ funnel, canvasNodes = [], mode = "build" }) {
           const best  = sorted[sorted.length - 1];
           const worstDrop = Math.max(0, 100 - (worst?.data?.rate || 0));
           return (
-            <div className="px-4 pt-1 pb-1">
-              <div className="rounded-lg border border-line-soft p-3 bg-white">
-                <div className="flex items-center gap-2 mb-2.5">
-                  <span className="w-7 h-7 rounded-md bg-warn-soft text-warn-deep inline-flex items-center justify-center">
-                    <Activity size={13}/>
+            <div className="px-4 pt-4 pb-2">
+              <div className="rounded-lg border border-line-soft p-4 bg-white">
+                <div className="flex items-center gap-2.5 mb-3.5">
+                  <span className="w-8 h-8 rounded-md bg-warn-soft text-warn-deep inline-flex items-center justify-center shrink-0">
+                    <Activity size={14}/>
                   </span>
                   <div className="flex-1 min-w-0">
-                    <div className="text-[10.5px] font-semibold uppercase tracking-wider text-ink-soft">Funnel health</div>
-                    <div className="text-[12px] font-semibold text-ink leading-tight">Needs attention</div>
+                    <div className="text-[10.5px] font-semibold uppercase tracking-wider text-ink-soft" style={{ letterSpacing: '0.07em' }}>Funnel health</div>
+                    <div className="text-[12.5px] font-semibold text-ink leading-tight mt-0.5">Needs attention</div>
                   </div>
                 </div>
-                <div className="space-y-2 text-[11.5px]">
+                <div className="space-y-3 text-[11.5px]">
                   <div>
-                    <div className="text-[10px] uppercase tracking-wider text-ink-soft">Biggest leak</div>
-                    <div className="text-ink leading-snug mt-0.5">
+                    <div className="text-[10px] uppercase tracking-wider text-ink-soft" style={{ letterSpacing: '0.07em' }}>Biggest leak</div>
+                    <div className="text-ink leading-snug mt-1">
                       <span className="font-semibold">{worst?.data?.title || '—'}</span>
                       <span className="text-bad-deep font-semibold tabular-nums"> · {worstDrop.toFixed(0)}% drop-off</span>
                     </div>
                   </div>
                   <div>
-                    <div className="text-[10px] uppercase tracking-wider text-ink-soft">Best step</div>
-                    <div className="text-ink leading-snug mt-0.5">
+                    <div className="text-[10px] uppercase tracking-wider text-ink-soft" style={{ letterSpacing: '0.07em' }}>Best step</div>
+                    <div className="text-ink leading-snug mt-1">
                       <span className="font-semibold">{best?.data?.title || '—'}</span>
                       <span className="text-good-deep font-semibold tabular-nums"> · {(best?.data?.rate || 0).toFixed(0)}% conversion</span>
                     </div>
                   </div>
                 </div>
                 <button onClick={() => window.dispatchEvent(new CustomEvent('open-ai-suggestions'))}
-                  className="mt-3 w-full h-7 px-2.5 inline-flex items-center justify-center gap-1 rounded text-[11.5px] font-semibold text-white bg-violet hover:bg-violet-deep transition-colors">
+                  className="mt-4 w-full h-8 px-2.5 inline-flex items-center justify-center gap-1.5 rounded text-[11.5px] font-semibold text-white bg-violet hover:bg-violet-deep transition-colors">
                   <Spark size={11}/> Open in AI suggestions
                 </button>
               </div>
@@ -5182,25 +5180,34 @@ function InspectorEmpty({ funnel, canvasNodes = [], mode = "build" }) {
           );
         })()}
 
-        {/* Activity feed */}
+        {/* Activity feed — collapsible. Click the heading row to toggle. */}
         <div className="border-t border-line-soft">
-          <div className="px-4 py-2.5 flex items-center justify-between">
-            <div className="text-[10.5px] font-semibold uppercase tracking-wider text-ink-soft">Activity</div>
-            <button className="text-[10.5px] text-brand font-medium hover:underline">View all</button>
-          </div>
-          <div className="pb-2">
-            {activity.map((a, i) => (
-              <div key={i} className="flex items-start gap-2.5 px-4 py-2 hover:bg-surface-sub transition-colors">
-                <span className="w-[22px] h-[22px] rounded-md flex items-center justify-center shrink-0 mt-px"
-                  style={{ background: a.color + '1a', color: a.color }}>
-                  {a.icon}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <div className="text-[12px] text-ink leading-snug">{a.text}</div>
-                  <div className="text-[10.5px] text-ink-soft mt-0.5">{a.time}</div>
+          <button onClick={() => setActivityOpen(!activityOpen)}
+            className="w-full flex items-center gap-1.5 px-4 py-2.5 hover:bg-surface-sub transition-colors group">
+            <ChevronDown size={11} sw={2} className={`text-ink-soft chev ${activityOpen ? '' : '-rotate-90'}`}/>
+            <span className="flex-1 text-[10.5px] font-semibold uppercase tracking-wider text-ink-soft text-left" style={{ letterSpacing: '0.07em' }}>Activity</span>
+            <span className="text-[10.5px] font-medium text-ink-soft tabular-nums bg-surface-muted group-hover:bg-white px-1.5 py-0.5 rounded transition-colors">{activity.length}</span>
+          </button>
+          <div className="accordion" data-open={activityOpen}>
+            <div>
+              <div className="pb-2">
+                {activity.map((a, i) => (
+                  <div key={i} className="flex items-start gap-2.5 px-4 py-2 hover:bg-surface-sub transition-colors">
+                    <span className="w-[22px] h-[22px] rounded-md flex items-center justify-center shrink-0 mt-px"
+                      style={{ background: a.color + '1a', color: a.color }}>
+                      {a.icon}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[12px] text-ink leading-snug">{a.text}</div>
+                      <div className="text-[10.5px] text-ink-soft mt-0.5">{a.time}</div>
+                    </div>
+                  </div>
+                ))}
+                <div className="px-4 pt-1">
+                  <button className="text-[10.5px] text-brand font-medium hover:underline">View all</button>
                 </div>
               </div>
-            ))}
+            </div>
           </div>
         </div>
       </div>
@@ -5829,7 +5836,7 @@ function InspectorEdge({ envelope, api }) {
         </Tip>
       </div>
 
-      <div className="flex-1 overflow-y-auto scroll-thin px-4 py-3 space-y-4">
+      <div className="flex-1 overflow-y-auto scroll-thin space-y-0">
         {/* Performance */}
         <InspSection label="Performance">
           <div className="grid grid-cols-2 gap-2">

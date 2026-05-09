@@ -414,11 +414,10 @@ button > * > *,
   cursor: pointer !important;
 }
 
-/* Inspector section separators — the first section in any panel doesn't
-   need a top border (the panel header is enough). Subsequent sections get
-   a border-top + extra top padding (set inline via Tailwind in InspSection). */
-.insp-section:first-of-type {
+/* Inspector section bands — heading rows have border-y. The very first
+   section's top border collapses into the panel header so we don't
+   double-up on borders. The `> *:first-child` selector targets the first
+   InspSection inside any details panel, hiding its top border only. */
+.insp-section:first-of-type > div:first-child {
   border-top: 0;
-  padding-top: 0;
-  margin-top: 0;
 }
