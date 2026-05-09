@@ -307,7 +307,7 @@ function Chip({ kind='neutral', children, sm=false, dot=false }) {
 function TopbarWired({ project, onProjectChange, mode, onModeChange }) {
   const [projOpen, setProjOpen] = useState(false);
   const projAnchor = useRef(null);
-  const modes = [{ id:'build',label:'Build',Icon:Wrench },{ id:'analyse',label:'Analyse',Icon:Bars },{ id:'optimise',label:'Optimise',Icon:ZapIcon }];
+  const modes = [{ id:'build',label:'Build',Icon:Wrench,tip:'Build — create and connect funnel steps' },{ id:'analyse',label:'Analyse',Icon:Bars,tip:'Analyse — see traffic, drop-off, and conversions' },{ id:'optimise',label:'Optimise',Icon:ZapIcon,tip:'Optimise — find tests and improvement ideas' }];
   return (
     <header className="h-12 px-3 bg-white border-b border-line flex items-center justify-between shrink-0 relative">
       <div className="flex items-center gap-2 min-w-0">
@@ -333,13 +333,15 @@ function TopbarWired({ project, onProjectChange, mode, onModeChange }) {
       </div>
 
       <div className="absolute left-1/2 -translate-x-1/2 inline-flex items-center h-[34px] p-0.5 gap-0.5 bg-surface-muted border border-line rounded-md">
-        {modes.map(({id,label,Icon}) => {
+        {modes.map(({id,label,Icon,tip}) => {
           const active = mode === id;
           return (
-            <button key={id} onClick={() => onModeChange(id)}
-              className={`inline-flex items-center gap-1.5 h-7 px-3 rounded text-[12px] font-medium transition-colors ${active ? 'bg-white text-genesis shadow-xs' : 'text-ink-muted hover:text-ink'}`}>
-              <Icon size={14}/> {label}
-            </button>
+            <Tip key={id} label={tip} side="bottom">
+              <button onClick={() => onModeChange(id)}
+                className={`inline-flex items-center gap-1.5 h-7 px-3 rounded text-[12px] font-medium transition-colors ${active ? 'bg-white text-genesis shadow-xs' : 'text-ink-muted hover:text-ink'}`}>
+                <Icon size={14}/> {label}
+              </button>
+            </Tip>
           );
         })}
       </div>
@@ -951,7 +953,7 @@ function TemplateModal({ template, onClose, onConfirm }) {
   );
 }
 
-function Sidebar({ onAIClick, collapsed, onToggleCollapsed, focusSection, onFocusSection, onTemplateClick, canvasApi, canvasNodes = [] }) {
+function Sidebar({ onAIClick, onBuildAIClick, collapsed, onToggleCollapsed, focusSection, onFocusSection, onTemplateClick, canvasApi, canvasNodes = [] }) {
   const [open, setOpen] = useState({ pages:true, inFunnel:false, sources:true, templates:false });
   const [folder, setFolder] = useState('root');
   const [search, setSearch] = useState('');
@@ -1087,17 +1089,25 @@ function Sidebar({ onAIClick, collapsed, onToggleCollapsed, focusSection, onFocu
       <div className="px-3 py-2.5 border-b border-line-soft shrink-0 flex items-center gap-2">
         <span className="text-[10.5px] font-semibold tracking-wider uppercase text-ink-soft">Quick add</span>
         <div className="flex-1"/>
+        {/* Pages cluster */}
         <QuickIcon Icon={Globe}    color="#10B981" tint="#ECFDF5" tintHover="#D1FAE5" label="Add traffic source"
           onClick={() => canvasApi?.current?.addNode({ type:'source', data:{ src:'fb', visitorsNum:0 } })}/>
         <QuickIcon Icon={FileIcon} color="#006CB5" tint="#E6F0F9" tintHover="#CCE0F1" label="Add page"
           onClick={() => canvasApi?.current?.addNode({ type:'page',   data:{ title:'New page', path:'/new', kind:'landing' } })}/>
         <QuickIcon Icon={Cart}     color="#7C3AED" tint="#F3EEFF" tintHover="#E9DEFF" label="Add checkout"
           onClick={() => canvasApi?.current?.addNode({ type:'page',   data:{ title:'Checkout', path:'/checkout', kind:'checkout' } })}/>
+        {/* Divider — separates page-creation from flow-logic */}
+        <div className="w-px h-5 bg-line-soft mx-0.5"/>
+        {/* Logic cluster */}
+        <QuickIcon Icon={Bars}     color="#7C3AED" tint="#F3EEFF" tintHover="#E9DEFF" label="Add A/B test"
+          onClick={() => canvasApi?.current?.addNode({ type:'logic', data:{ kind:'abtest', title:'A/B Test', split:50 } })}/>
+        <QuickIcon Icon={Workflow} color="#7C3AED" tint="#F3EEFF" tintHover="#E9DEFF" label="Add condition"
+          onClick={() => canvasApi?.current?.addNode({ type:'logic', data:{ kind:'condition', title:'Condition' } })}/>
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto scroll-thin">
         {(!isSearching || folderItems.length > 0) && <div ref={sectionRefs.pages}>
-          <Section title="Your pages" count={isSearching ? folderItems.length : Object.keys(PAGES).length}
+          <Section title="Add Pages" count={isSearching ? folderItems.length : Object.keys(PAGES).length}
             open={isSearching ? true : open.pages} onToggle={() => toggle('pages')}>
             {folder !== 'root' && (
               <div className="flex items-center gap-1 px-4 pb-1 text-[11px]">
@@ -1121,11 +1131,11 @@ function Sidebar({ onAIClick, collapsed, onToggleCollapsed, focusSection, onFocu
         </div>}
 
         {(!isSearching || inFunnelMatches.length > 0) && <div ref={sectionRefs.inFunnel}>
-          <Section title="In this funnel" count={isSearching ? inFunnelMatches.length : inFunnelLive.length}
+          <Section title="Current Funnel" count={isSearching ? inFunnelMatches.length : inFunnelLive.length}
             open={isSearching ? true : open.inFunnel} onToggle={() => toggle('inFunnel')}>
             {(isSearching ? inFunnelMatches : inFunnelLive).length === 0 && !isSearching && (
               <div className="px-4 py-3 text-[11px] text-ink-soft leading-relaxed">
-                No pages on the canvas yet. Drag a page from "Your pages" or use Quick&nbsp;add.
+                No pages added yet. Drag a page from Add Pages above, use Quick&nbsp;add, or start with a template.
               </div>
             )}
             {(isSearching ? inFunnelMatches : inFunnelLive).map(p =>
@@ -1141,14 +1151,14 @@ function Sidebar({ onAIClick, collapsed, onToggleCollapsed, focusSection, onFocu
         </div>}
 
         {(!isSearching || sourceMatches.length > 0) && <div ref={sectionRefs.sources}>
-          <Section title="Traffic sources" count={isSearching ? sourceMatches.length : SOURCES.length}
+          <Section title="Traffic" count={isSearching ? sourceMatches.length : SOURCES.length}
             open={isSearching ? true : open.sources} onToggle={() => toggle('sources')}>
             {(isSearching ? sourceMatches : SOURCES).map(s => <SourceRow key={s.id} source={s} inFunnel={sourceIdsOnCanvas.has(s.id)}/>)}
           </Section>
         </div>}
 
         {(!isSearching || templateMatches.length > 0) && <div ref={sectionRefs.templates}>
-          <Section title="Templates" count={isSearching ? templateMatches.length : TEMPLATES.length}
+          <Section title="Funnel Templates" count={isSearching ? templateMatches.length : TEMPLATES.length}
             open={isSearching ? true : open.templates} onToggle={() => toggle('templates')} last>
             <div className="space-y-1.5 py-1">
               {(isSearching ? templateMatches : TEMPLATES).map(t => <TemplateCard key={t.id} tpl={t} onClick={() => onTemplateClick(t)}/>)}
@@ -1167,14 +1177,25 @@ function Sidebar({ onAIClick, collapsed, onToggleCollapsed, focusSection, onFocu
         )}
       </div>
 
-      <div className="border-t border-line-soft bg-surface-sub p-2.5 shrink-0">
-        <button onClick={onAIClick} className="w-full flex items-center gap-2 px-3 py-2 rounded-md bg-white border border-line hover:border-violet hover:bg-violet-soft transition-colors">
-          <span className="w-7 h-7 rounded-md bg-violet-soft text-violet flex items-center justify-center ai-ripple">
+      <div className="border-t border-line-soft bg-surface-sub p-2.5 shrink-0 space-y-1.5">
+        {/* Primary AI action — opens conversational sidebar mode */}
+        <button onClick={onBuildAIClick} className="w-full flex items-center gap-2 px-3 py-2 rounded-md bg-violet text-white hover:bg-violet-deep transition-colors shadow-xs">
+          <span className="w-7 h-7 rounded-md bg-white/20 text-white flex items-center justify-center ai-ripple">
             <Spark size={14} className="ai-breathe-icon"/>
           </span>
           <div className="flex-1 text-left">
+            <div className="text-[12.5px] font-semibold leading-none">Build with AI</div>
+            <div className="text-[10.5px] text-white/80 mt-0.5">Describe your funnel, AI builds it</div>
+          </div>
+        </button>
+        {/* Secondary — passive suggestions */}
+        <button onClick={onAIClick} className="w-full flex items-center gap-2 px-3 py-2 rounded-md bg-white border border-line hover:border-violet hover:bg-violet-soft transition-colors">
+          <span className="w-7 h-7 rounded-md bg-violet-soft text-violet flex items-center justify-center">
+            <Spark size={14}/>
+          </span>
+          <div className="flex-1 text-left">
             <div className="text-[12.5px] font-semibold text-ink leading-none">AI suggestions</div>
-            <div className="text-[10.5px] text-ink-soft mt-0.5">Smart tips for this funnel</div>
+            <div className="text-[10.5px] text-ink-soft mt-0.5">3 smart tips for this funnel</div>
           </div>
           <span className="inline-flex items-center justify-center min-w-[20px] h-[18px] px-1 rounded-full bg-violet text-white text-[10px] font-bold tabular-nums">3</span>
         </button>
@@ -1547,7 +1568,7 @@ function PageNode({ node, selected, mode, onSelect, onDragStart, onConnectStart,
 
   const handleCardMouseDown = (e) => {
     if (e.target.closest('button, [data-no-drag], [data-connector-dot]')) return;
-    if (readonly) return;
+    // Analyse mode: cards still draggable for layout tweaks, but no delete/connect
     e.stopPropagation();
     onDragStart(node.id, e);
   };
@@ -1740,7 +1761,7 @@ function SourceNode({ node, selected, onSelect, onDragStart, onConnectStart, onC
 
   const handleCardMouseDown = (e) => {
     if (e.target.closest('button, [data-no-drag], [data-connector-dot]')) return;
-    if (readonly) return;
+    // Analyse mode: cards still draggable for layout tweaks, but no delete/connect
     e.stopPropagation();
     onDragStart(node.id, e);
   };
@@ -1907,7 +1928,7 @@ function LogicNode({ node, selected, onSelect, onDragStart, onConnectStart, onRe
 
   const handleCardMouseDown = (e) => {
     if (e.target.closest('button, [data-no-drag], [data-connector-dot]')) return;
-    if (readonly) return;
+    // Analyse mode: cards still draggable for layout tweaks, but no delete/connect
     e.stopPropagation();
     onDragStart(node.id, e);
   };
@@ -1994,7 +2015,7 @@ function LogicNode({ node, selected, onSelect, onDragStart, onConnectStart, onRe
         side="right"
         nodeId={node.id}
         onConnectStart={onConnectStart}
-        color={VIOLET}/>
+        color={VIOLET} hidden={readonly}/>
     </div>
   );
 }
@@ -2304,10 +2325,10 @@ function EdgeOverlays({ nodes, edges, zoom, hovered, onHover, onRemove, onInsert
               const w = text.length * 6.5 + 16;
               return (
                 <g transform={`translate(${geo.mx}, ${geo.my + (hasLabel ? 14 : 0)})`} style={{ pointerEvents: 'none' }}>
-                  <rect x={-w/2} y="-10" width={w} height="20" rx="10"
+                  <rect x={-w/2} y="-12" width={w} height="24" rx="12"
                         fill="white" stroke="#E5E7EB" strokeWidth="1"
                         style={{ filter: 'drop-shadow(0 1px 2px rgba(15,23,42,0.06))' }}/>
-                  <text textAnchor="middle" y="4" fontSize="10.5" fontWeight="600" fill="#0F172A"
+                  <text textAnchor="middle" y="4.5" fontSize="12" fontWeight="700" fill="#0F172A"
                         style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}>{text}</text>
                 </g>
               );
@@ -2325,34 +2346,65 @@ function EdgeOverlays({ nodes, edges, zoom, hovered, onHover, onRemove, onInsert
               const isOpen = statsOpen === i;
               const e2 = edges[i];
               const fromNode = nodes.find(n => n.id === e2?.from);
+              const toNode   = nodes.find(n => n.id === e2?.to);
+              const fromTitle = fromNode?.data?.title || (fromNode?.type === 'source' ? (SOURCES.find(s => s.id === fromNode?.data?.src)?.name || 'Source') : 'From');
+              const toTitle   = toNode?.data?.title   || 'To';
+              // Pick chip colour from source-node's brand colour (or brand blue)
+              const fromColor = fromNode?.type === 'source'
+                ? (SOURCES.find(s => s.id === fromNode?.data?.src)?.color || '#006CB5')
+                : (PAGE_TYPE[fromNode?.data?.pageType]?.color || '#006CB5');
               // Mock figures derived from edge volume
               const vol = e2?.volume || 0;
-              const conv = vol ? Math.round((vol / Math.max(1, fromNode?.data?.visitorsNum || 100)) * 100) : 0;
+              const conv = vol ? Math.round((vol / Math.max(1, fromNode?.data?.visitorsNum || fromNode?.data?.visitors || 100)) * 100) : 0;
+              const drop = Math.max(0, 100 - conv);
               return (
-                <foreignObject x={geo.mx + 18} y={geo.my - 11} width={26} height={22} style={{ overflow: 'visible', pointerEvents: 'auto' }}>
+                <foreignObject x={geo.mx + 22} y={geo.my - 13} width={30} height={26} style={{ overflow: 'visible', pointerEvents: 'auto' }}>
                   <div style={{ width: 26, position: 'relative' }}>
                     <button onClick={(ev) => { ev.stopPropagation(); setStatsOpen(isOpen ? null : i); }}
-                      title="Path stats"
-                      className="w-[22px] h-[22px] inline-flex items-center justify-center rounded-md bg-white border border-line shadow-xs hover:border-brand text-ink-muted hover:text-brand transition-colors">
-                      <TrendingUp size={10}/>
+                      title={`${fromTitle} → ${toTitle}`}
+                      className="w-[26px] h-[26px] inline-flex items-center justify-center rounded-full text-white shadow-card hover:shadow-menu transition-shadow"
+                      style={{ background: fromColor }}>
+                      <TrendingUp size={13}/>
                     </button>
                     {isOpen && (
                       <div onClick={(ev) => ev.stopPropagation()}
-                        className="absolute left-0 top-7 z-50 w-[220px] bg-white rounded-md border border-line shadow-menu p-3 ctx-menu"
+                        className="absolute left-1/2 -translate-x-1/2 top-9 z-50 w-[280px] bg-white rounded-lg border border-line shadow-menu overflow-hidden ctx-menu"
                         style={{ pointerEvents: 'auto' }}>
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="text-[10.5px] font-semibold uppercase tracking-wider text-ink-soft">Path stats</div>
+                        {/* Coloured headline strip */}
+                        <div className="px-3 py-2.5 text-white flex items-center gap-2 relative" style={{ background: fromColor }}>
+                          <TrendingUp size={13}/>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[10.5px] uppercase tracking-wider opacity-85">Path stats</div>
+                            <div className="text-[12.5px] font-semibold leading-tight truncate">
+                              {fromTitle} <span className="opacity-70">→</span> {toTitle}
+                            </div>
+                          </div>
                           <button onClick={() => setStatsOpen(null)}
-                            className="text-ink-soft hover:text-ink"><X size={11}/></button>
+                            className="w-5 h-5 inline-flex items-center justify-center rounded hover:bg-white/20 transition-colors">
+                            <X size={11}/>
+                          </button>
                         </div>
-                        <div className="space-y-1.5 text-[11.5px]">
-                          <div className="flex justify-between"><span className="text-ink-soft">Visitors</span><span className="text-ink font-semibold tabular-nums">{vol.toLocaleString()}</span></div>
-                          <div className="flex justify-between"><span className="text-ink-soft">Conversion</span><span className="text-ink font-semibold tabular-nums">{conv}%</span></div>
-                          <div className="flex justify-between"><span className="text-ink-soft">Drop-off</span><span className="text-ink font-semibold tabular-nums">{Math.max(0, 100 - conv)}%</span></div>
-                          <div className="flex justify-between"><span className="text-ink-soft">Time-to-next</span><span className="text-ink font-semibold tabular-nums">0:42</span></div>
+                        {/* Stats body — bigger numbers, two-column */}
+                        <div className="p-3 grid grid-cols-2 gap-x-3 gap-y-2">
+                          <div>
+                            <div className="text-[10px] uppercase tracking-wider text-ink-soft">Visitors</div>
+                            <div className="text-[15px] font-semibold text-ink tabular-nums leading-tight mt-0.5">{vol.toLocaleString()}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] uppercase tracking-wider text-ink-soft">Conversion</div>
+                            <div className="text-[15px] font-semibold text-good-deep tabular-nums leading-tight mt-0.5">{conv}%</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] uppercase tracking-wider text-ink-soft">Drop-off</div>
+                            <div className="text-[15px] font-semibold text-ink tabular-nums leading-tight mt-0.5">{drop}%</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] uppercase tracking-wider text-ink-soft">Time-to-next</div>
+                            <div className="text-[15px] font-semibold text-ink tabular-nums leading-tight mt-0.5">0:42</div>
+                          </div>
                         </div>
-                        <div className="mt-2 pt-2 border-t border-line-soft text-[10.5px] text-ink-soft leading-snug">
-                          Calculated from last-7-day traffic. Drop-off = visitors who entered this edge but didn't reach the next step.
+                        <div className="px-3 py-2 bg-surface-sub border-t border-line-soft text-[10.5px] text-ink-soft leading-snug">
+                          From last 7 days. Drop-off = visitors who entered this edge but didn't reach the next step.
                         </div>
                       </div>
                     )}
@@ -3064,18 +3116,64 @@ function Canvas({ mode, demoState, onDemoStateChange, onJumpToTemplates, onJumpT
     }, 340);
   };
 
-  /* fit on demo state change so each preset renders well-framed.
-     Also reset the mutable nodes/edges to the preset's data. */
+  /* On demo state change: load preset data and center the view.
+     First mount stays at 100% zoom (so users always land on a 100% view —
+     small funnels don't shrink). Subsequent demo-state switches fit-to-canvas
+     so the user can compare framings. */
+  const firstMountRef = useRef(true);
   useEffect(() => {
     const s = DEMO_STATES[demoState] || DEMO_STATES.empty;
     setNodes(s.nodes);
     setEdges(s.edges);
     setSelected(null);
     setHoveredEdge(null);
+    if (firstMountRef.current) {
+      // Initial paint — keep zoom at 100%, just center.
+      firstMountRef.current = false;
+      setZoom(1);
+      const t = setTimeout(() => {
+        const el = containerRef.current;
+        if (!el || !s.nodes.length) return;
+        // Center on the bbox of nodes
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        s.nodes.forEach(n => {
+          const w = NODE_W[n.type], h = getNodeH(n, mode);
+          minX = Math.min(minX, n.x); minY = Math.min(minY, n.y);
+          maxX = Math.max(maxX, n.x + w); maxY = Math.max(maxY, n.y + h);
+        });
+        const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+        setPan({ x: el.clientWidth / 2 - cx, y: el.clientHeight / 2 - cy });
+      }, 0);
+      return () => clearTimeout(t);
+    }
     /* defer one tick so containerRef has measured; pass fresh nodes directly */
     const t = setTimeout(() => fitToCanvas(s.nodes), 0);
     return () => clearTimeout(t);
   }, [demoState]);
+
+  /* Mode change: when entering Analyse for the first time, snap to 100% and
+     center so user can read card detail. (Auto-layout deferred — would conflict
+     with user-positioned cards.) */
+  const prevModeRef = useRef(mode);
+  useEffect(() => {
+    if (prevModeRef.current === mode) return;
+    if (mode === 'analyse' && prevModeRef.current !== 'analyse') {
+      setZoom(1);
+      // Center on bbox
+      const el = containerRef.current;
+      if (el && nodes.length) {
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        nodes.forEach(n => {
+          const w = NODE_W[n.type], h = getNodeH(n, mode);
+          minX = Math.min(minX, n.x); minY = Math.min(minY, n.y);
+          maxX = Math.max(maxX, n.x + w); maxY = Math.max(maxY, n.y + h);
+        });
+        const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+        setPan({ x: el.clientWidth / 2 - cx, y: el.clientHeight / 2 - cy });
+      }
+    }
+    prevModeRef.current = mode;
+  }, [mode, nodes]);
 
   /* keyboard: Z = fit-to-canvas, Esc = deselect */
   useEffect(() => {
@@ -3244,9 +3342,9 @@ function Canvas({ mode, demoState, onDemoStateChange, onJumpToTemplates, onJumpT
         </div>
       )}
 
-      {/* canvas top-left controls + optimise tests panel + zoom */}
+      {/* canvas top-left controls + zoom — Optimise tests now live in
+          the Inspector empty-state when in Optimise mode */}
       <ExportFunnelButton/>
-      {mode === "optimise" && <OptimiseTestsPanel/>}
       {!isEmpty && <ZoomControls
         zoom={zoom}
         onZoomIn={() => setZoom(z => Math.min(2, z + 0.1))}
@@ -3318,7 +3416,7 @@ function Inspector({ node, api, mode }) {
       <div style={{ width: 320 }} className="flex-1 flex flex-col min-h-0">
         {open && (
           <>
-            <InspectorHeader node={node} onClose={() => api.deselect()}/>
+            <InspectorHeader node={node} onClose={() => api.deselect()} api={api}/>
             <InspectorTabs tab={tab} onTabChange={setTab}/>
             <div className="flex-1 overflow-y-auto scroll-thin">
               {tab === 'details'  && <InspectorDetails node={node} api={api} mode={mode}/>}
@@ -3333,11 +3431,22 @@ function Inspector({ node, api, mode }) {
 }
 
 /* InspectorHeader — type badge + title + close X. Title is editable inline. */
-function InspectorHeader({ node, onClose }) {
+function InspectorHeader({ node, onClose, api }) {
+  // Adds a clickable status pill (manual status change is discoverable here
+  // rather than buried in Settings → General). Pulse animation now uses
+  // pl-1 + py-1 padding on parent so the dot's outer ring isn't clipped.
   const meta = inspectorMeta(node);
   const Ic = meta.Icon;
+  const status = node?.data?.status || 'draft';
+  const [statusOpen, setStatusOpen] = useState(false);
+  const STATUS = {
+    live:   { label: 'Live',   dot: 'bg-good',   pulse: true },
+    draft:  { label: 'Draft',  dot: 'bg-warn',   pulse: false },
+    paused: { label: 'Paused', dot: 'bg-ink-soft', pulse: false },
+  };
+  const cur = STATUS[status] || STATUS.draft;
   return (
-    <div className="px-4 py-3 border-b border-line-soft flex items-center gap-2.5">
+    <div className="px-4 py-3 border-b border-line-soft flex items-center gap-2.5 overflow-visible">
       <span className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0"
             style={{ background: meta.color + '1a', color: meta.color }}>
         <Ic size={14}/>
@@ -3346,9 +3455,32 @@ function InspectorHeader({ node, onClose }) {
         <div className="text-[10px] font-semibold uppercase tracking-wider"
              style={{ color: meta.color, letterSpacing: '0.06em' }}>
           {meta.kindLabel}
-          <span className="text-ink-soft font-normal"> · selected</span>
         </div>
         <div className="text-[13px] font-semibold text-ink truncate leading-tight mt-0.5">{meta.title}</div>
+      </div>
+      <div className="relative flex-shrink-0">
+        <button onClick={() => setStatusOpen(o => !o)}
+          className="inline-flex items-center gap-1.5 h-6 px-2 rounded-md bg-surface-sub border border-line-soft hover:border-line text-[10.5px] font-semibold text-ink transition-colors">
+          <span className="relative inline-flex w-1.5 h-1.5">
+            <span className={`absolute inset-0 rounded-full ${cur.dot}`}/>
+            {cur.pulse && <span className={`absolute inset-0 rounded-full ${cur.dot} live-dot opacity-60`}/>}
+          </span>
+          {cur.label}
+          <ChevronDown size={9} className="text-ink-soft" strokeWidth={2}/>
+        </button>
+        {statusOpen && (
+          <div className="absolute right-0 top-full mt-1 z-50 ctx-menu w-[120px] bg-white rounded-md border border-line shadow-menu p-1"
+               onMouseLeave={() => setStatusOpen(false)}>
+            {['draft', 'live', 'paused'].map(s => (
+              <button key={s}
+                onClick={() => { api?.updateNodeData(node.id, { status: s }); setStatusOpen(false); }}
+                className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-[12px] hover:bg-surface-sub transition-colors ${status === s ? 'text-ink font-semibold' : 'text-ink-muted'}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${STATUS[s].dot}`}/>
+                {STATUS[s].label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       <Tip label="Close inspector  Esc" side="bottom">
         <button onClick={onClose}
@@ -3383,17 +3515,20 @@ function inspectorMeta(node) {
    topbar Build/Analyse/Optimise tabs: 12px medium, light grey → dark active,
    no underline indicator. */
 function InspectorTabs({ tab, onTabChange }) {
+  // Details + Settings only. Leads dropped permanently — funnel builder is
+  // about structure, not lead management (that lives elsewhere in Estage).
+  // Tabs left-aligned, stretched edge-to-edge so the underline-free strip
+  // sits flush with the Details/Settings content below.
   const tabs = [
     { id: 'details',  label: 'Details'  },
-    { id: 'leads',    label: 'Leads'    },
     { id: 'settings', label: 'Settings' },
   ];
   return (
-    <div className="border-b border-line-soft flex items-stretch px-2">
+    <div className="border-b border-line-soft flex items-stretch">
       {tabs.map(t => (
         <button key={t.id} onClick={() => onTabChange(t.id)}
-          className={`flex-1 px-2 py-2 text-[12px] font-medium transition-colors
-                      ${tab === t.id ? 'text-ink' : 'text-ink-soft hover:text-ink-muted'}`}>
+          className={`flex-1 px-4 py-2.5 text-[12px] font-medium text-left transition-colors
+                      ${tab === t.id ? 'text-ink bg-white' : 'text-ink-soft hover:text-ink-muted hover:bg-surface-sub'}`}>
           {t.label}
         </button>
       ))}
@@ -4237,7 +4372,7 @@ function SuggestedWin({ title, body, impact, cta }) {
   );
 }
 
-function InspectorEmpty({ funnel, canvasNodes = [] }) {
+function InspectorEmpty({ funnel, canvasNodes = [], mode = "build" }) {
   /* Funnel overview — date range + Basic/Advanced toggle.
      Advanced (revenue/AOV/CPA/ROI) auto-unlocks only when the funnel has at
      least one priced checkout-class card OR at least one paid source with cost. */
@@ -4315,6 +4450,16 @@ function InspectorEmpty({ funnel, canvasNodes = [] }) {
     { label: 'ROI',       value: roi.toFixed(1) + '×', delta: '+0.7×', good: true,  Icon: TrendingUp,   color: '#0D9488' },
   ];
   const stats = view === 'advanced' && canShowAdvanced ? advStats : basicStats;
+
+  // Optimise mode — replace the stats grid entirely with the optimisation queue
+  // (Urgent fixes / Growth tests / Completed learnings).
+  if (mode === 'optimise') {
+    return <OptimiseEmptyState funnel={funnel}/>;
+  }
+
+  // Analyse mode — diagnosis-first layout: biggest leak + best step + next action
+  // ABOVE the stats. Build mode keeps the standard stats grid.
+  const showDiagnosis = mode === 'analyse';
   const activity = [
     { color: '#10B981', icon: <Check    size={11}/>, text: <>Funnel <span className="font-medium">published</span></>,                                           time: '2m ago' },
     { color: '#EA4335', icon: <Mail     size={11}/>, text: <>New email step added to <span className="font-medium">Lead form</span></>,                          time: '24m ago' },
@@ -4364,7 +4509,7 @@ function InspectorEmpty({ funnel, canvasNodes = [] }) {
 
       <div className="flex-1 min-h-0 overflow-y-auto scroll-thin">
         {/* Stats grid — 8 stats, 2 cols, white cards with category-colored icon chips */}
-        <div className="px-4 py-3 grid grid-cols-2 gap-2">
+        <div className="px-4 py-3 grid grid-cols-2 gap-2 stat-stagger">
           {stats.map((s, i) => (
             <div key={i} className="bg-white border border-line-soft rounded-md px-2.5 py-2 hover:border-line-strong transition-colors">
               <div className="flex items-center justify-between">
@@ -4674,19 +4819,20 @@ function ExportFunnelButton() {
         <ChevronDown size={9} strokeWidth={2}/>
       </button>
       {open && (
-        <div className="ctx-menu absolute left-0 top-full mt-1 w-[180px] bg-white rounded-md border border-line shadow-menu p-1 z-50"
+        <div className="ctx-menu absolute left-0 top-full mt-1 w-[210px] bg-white rounded-md border border-line shadow-menu p-1 z-50"
              onClick={(e) => e.stopPropagation()}>
-          <button onClick={() => { console.log('[Export] PNG'); setOpen(false); }}
-            className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-surface-sub text-[12px] text-ink transition-colors">
+          <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-ink-soft">Coming soon</div>
+          <button disabled
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-[12px] text-ink-soft cursor-not-allowed opacity-70">
             <FileIcon size={12} className="text-ink-soft"/> Download as PNG
           </button>
-          <button onClick={() => { console.log('[Export] PDF'); setOpen(false); }}
-            className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-surface-sub text-[12px] text-ink transition-colors">
+          <button disabled
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-[12px] text-ink-soft cursor-not-allowed opacity-70">
             <FileIcon size={12} className="text-ink-soft"/> Download as PDF
           </button>
-          <button onClick={() => { console.log('[Export] HTML'); setOpen(false); }}
-            className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-surface-sub text-[12px] text-ink transition-colors">
-            <FileIcon size={12} className="text-ink-soft"/> Download as HTML
+          <button disabled
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-[12px] text-ink-soft cursor-not-allowed opacity-70">
+            <FileIcon size={12} className="text-ink-soft"/> Copy share link
           </button>
         </div>
       )}
@@ -4695,8 +4841,194 @@ function ExportFunnelButton() {
 }
 
 
+
+/* BuildWithAIChat — sidebar overlay activated by the "Build with AI" button.
+   Sits above the regular sidebar, takes its width, mocks a chat conversation.
+   Backed by static messages for the demo (no real LLM calls). The "back" arrow
+   exits chat mode and restores the normal sidebar. */
+function BuildWithAIChat({ open, onClose }) {
+  const [input, setInput] = useState('');
+  const [messages, setMessages] = useState([
+    { from: 'ai', text: "Hi! I'll help you build a funnel. What kind of business do you have, and what do you want this funnel to achieve?" },
+  ]);
+  const send = () => {
+    const v = input.trim();
+    if (!v) return;
+    setMessages(ms => [...ms, { from: 'user', text: v }]);
+    setInput('');
+    // Mock AI response after a short delay
+    setTimeout(() => {
+      setMessages(ms => [...ms, {
+        from: 'ai',
+        text: "Great. Based on what you described, I'd recommend a Lead Magnet funnel: Landing → Form → Thank You. I can drop a starter onto the canvas with placeholder copy you can edit. Want me to do that?"
+      }]);
+    }, 700);
+  };
+  if (!open) return null;
+  return (
+    <aside className="absolute inset-0 z-40 bg-white flex flex-col"
+      style={{ animation: 'slideInLeft 180ms ease-out' }}>
+      {/* Header — back arrow + title */}
+      <div className="px-3 py-2.5 border-b border-line-soft flex items-center gap-2 shrink-0">
+        <button onClick={onClose}
+          className="w-7 h-7 inline-flex items-center justify-center rounded-md text-ink-muted hover:text-ink hover:bg-surface-sub transition-colors">
+          <ChevronLeft size={14}/>
+        </button>
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <span className="w-7 h-7 rounded-md bg-violet-soft text-violet flex items-center justify-center ai-ripple shrink-0">
+            <Spark size={13} className="ai-breathe-icon"/>
+          </span>
+          <div className="flex-1 min-w-0">
+            <div className="text-[12.5px] font-semibold text-ink leading-tight">Build with AI</div>
+            <div className="text-[10.5px] text-ink-soft mt-0.5">Conversational funnel builder</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Collapsed section bar — sections still visible as headers, just inert */}
+      <div className="border-b border-line-soft shrink-0">
+        {[
+          { label: 'Add Pages',        count: 12 },
+          { label: 'Current Funnel',   count: 0  },
+          { label: 'Traffic',          count: 9  },
+          { label: 'Funnel Templates', count: 7  },
+        ].map(s => (
+          <div key={s.label} className="px-4 py-1.5 flex items-center gap-2 text-[11px] text-ink-soft border-b border-line-soft last:border-b-0 opacity-60">
+            <ChevronRight size={9} className="text-ink-soft"/>
+            <span className="font-medium text-ink-muted">{s.label}</span>
+            <span className="ml-auto tabular-nums">{s.count}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Chat scroll */}
+      <div className="flex-1 min-h-0 overflow-y-auto scroll-thin px-3 py-3 space-y-2.5">
+        {messages.map((m, i) => (
+          <div key={i} className={`flex ${m.from === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-[85%] px-3 py-2 rounded-lg text-[12px] leading-snug ${
+              m.from === 'user' ? 'bg-violet text-white' : 'bg-surface-sub text-ink border border-line-soft'
+            }`}>
+              {m.text}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Composer */}
+      <div className="border-t border-line-soft p-2.5 shrink-0 flex items-end gap-1.5">
+        <textarea value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
+          placeholder="Describe your funnel…"
+          rows={1}
+          className="flex-1 px-2.5 py-2 text-[12.5px] bg-surface-sub border border-line-soft rounded-md outline-none focus:border-violet focus:ring-2 focus:ring-violet-soft resize-none placeholder:text-ink-soft"/>
+        <button onClick={send}
+          className="w-9 h-9 inline-flex items-center justify-center rounded-md bg-violet text-white hover:bg-violet-deep transition-colors shrink-0">
+          <ChevronRight size={14}/>
+        </button>
+      </div>
+    </aside>
+  );
+}
+
+
+
+/* OptimiseEmptyState — replaces the stats grid in the Inspector empty-state
+   when mode === 'optimise'. Three queues: Urgent fixes / Growth tests /
+   Completed learnings. Each item is clickable and would open the suggestion
+   modal in a real product. */
+function OptimiseEmptyState({ funnel }) {
+  const URGENT = [
+    { name: 'Landing page drop-off', card: 'May Promo Landing', impact: 'High', why: '76% drop to Lead Form' },
+    { name: 'Checkout abandonment',   card: 'Cart',              impact: 'High', why: 'Below benchmark' },
+  ];
+  const GROWTH = [
+    { name: 'Headline A/B test',  card: 'Landing Page', impact: 'Med',  lift: '+8–14%' },
+    { name: 'Pricing layout test', card: 'Sales Page',  impact: 'Med',  lift: '+3–6%'  },
+    { name: 'Form length test',    card: 'Lead Form',   impact: 'High', lift: '+11%'   },
+  ];
+  const DONE = [
+    { name: 'CTA color test',  card: 'Landing Page', result: '+8% lift', date: 'Apr 28' },
+  ];
+
+  return (
+    <div className="flex-1 min-h-0 flex flex-col">
+      <div className="px-4 py-3 border-b border-line-soft shrink-0">
+        <div className="text-[10.5px] font-semibold uppercase tracking-wider text-ink-soft">Optimise queue</div>
+        <div className="text-[13px] font-semibold text-ink mt-0.5 truncate">{funnel?.name || 'Untitled funnel'}</div>
+        <div className="mt-1.5 flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-violet"/>
+          <span className="text-[10.5px] text-ink-soft">{URGENT.length} urgent · {GROWTH.length} growth · {DONE.length} completed</span>
+        </div>
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-y-auto scroll-thin">
+        {/* Urgent fixes */}
+        <OptimiseSection title="Urgent fixes" accent="bg-bad text-white" count={URGENT.length}>
+          {URGENT.map((t, i) => (
+            <OptimiseRow key={i} title={t.name} subtitle={`on ${t.card} · ${t.why}`} pill={t.impact} pillKind="bad"/>
+          ))}
+        </OptimiseSection>
+        {/* Growth tests */}
+        <OptimiseSection title="Growth tests" accent="bg-violet text-white" count={GROWTH.length}>
+          {GROWTH.map((t, i) => (
+            <OptimiseRow key={i} title={t.name} subtitle={`on ${t.card} · ${t.lift} estimated`} pill={t.impact} pillKind="violet"/>
+          ))}
+        </OptimiseSection>
+        {/* Completed learnings */}
+        <OptimiseSection title="Completed learnings" accent="bg-good text-white" count={DONE.length} last>
+          {DONE.map((t, i) => (
+            <OptimiseRow key={i} title={t.name} subtitle={`on ${t.card} · ${t.date}`} pill={t.result} pillKind="good"/>
+          ))}
+        </OptimiseSection>
+      </div>
+
+      <div className="px-3 py-2.5 border-t border-line-soft bg-surface-sub flex items-center gap-2 shrink-0">
+        <span className="w-7 h-7 rounded-md bg-violet-soft text-violet flex items-center justify-center ai-ripple">
+          <Spark size={13} className="ai-breathe-icon"/>
+        </span>
+        <span className="text-[11.5px] text-ink-soft flex-1 leading-snug">Run an AI audit to discover more opportunities.</span>
+        <button className="h-7 px-2.5 inline-flex items-center text-[11.5px] font-semibold text-violet hover:bg-violet-soft rounded transition-colors">
+          Run audit
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function OptimiseSection({ title, accent, count, last, children }) {
+  return (
+    <div className={`${last ? '' : 'border-b border-line-soft'}`}>
+      <div className="px-4 py-2 flex items-center gap-2">
+        <span className={`text-[9px] font-bold uppercase tracking-wider ${accent} px-1.5 py-0.5 rounded`}>{count}</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-ink">{title}</span>
+      </div>
+      <div>{children}</div>
+    </div>
+  );
+}
+
+function OptimiseRow({ title, subtitle, pill, pillKind }) {
+  const pillClass = {
+    bad:    'bg-bad-soft text-bad-deep',
+    violet: 'bg-violet-soft text-violet',
+    good:   'bg-good-soft text-good-deep',
+  }[pillKind] || 'bg-surface-sub text-ink';
+  return (
+    <button className="w-full px-4 py-2 flex items-start gap-2 hover:bg-surface-sub transition-colors text-left">
+      <div className="flex-1 min-w-0">
+        <div className="text-[12px] font-medium text-ink truncate">{title}</div>
+        <div className="text-[10.5px] text-ink-soft mt-0.5 truncate">{subtitle}</div>
+      </div>
+      <span className={`text-[10px] font-semibold rounded px-1.5 py-px ${pillClass} shrink-0`}>{pill}</span>
+    </button>
+  );
+}
+
+
 export default function App() {
   const [aiOpen, setAiOpen] = useState(false);
+  const [aiChatOpen, setAiChatOpen] = useState(false); // Build with AI sidebar mode
   const [collapsed, setCollapsed] = useState(false);
   const [focusSection, setFocusSection] = useState(null);
   const [toast, setToast] = useState(null); // { message, kind } | null
@@ -4736,15 +5068,16 @@ export default function App() {
       <TopbarWired project={project} onProjectChange={setProject} mode={mode} onModeChange={setMode}/>
       <ContextBar funnel={funnel} onFunnelChange={setFunnel} mode={mode}/>
       <div className="flex-1 flex min-h-0">
-        <Sidebar
+        <div className="relative flex"><Sidebar
           onAIClick={() => setAiOpen(true)}
+          onBuildAIClick={() => setAiChatOpen(true)}
           collapsed={collapsed}
           onToggleCollapsed={() => setCollapsed(c => !c)}
           focusSection={focusSection}
           onFocusSection={setFocusSection}
           onTemplateClick={setTemplateModal}
           canvasApi={canvasApi}
-          canvasNodes={canvasNodes}/>
+          canvasNodes={canvasNodes}/><BuildWithAIChat open={aiChatOpen} onClose={() => setAiChatOpen(false)}/></div>
         <Canvas
           onNodesChange={setCanvasNodes}
           mode={mode}
@@ -4756,7 +5089,7 @@ export default function App() {
           canvasApiRef={canvasApi}/>
         {selectedNode
           ? <Inspector node={selectedNode} api={canvasApi.current || {}} mode={mode}/>
-          : <InspectorEmpty funnel={funnel} canvasNodes={canvasNodes}/>}
+          : <InspectorEmpty funnel={funnel} canvasNodes={canvasNodes} mode={mode}/>}
       </div>
       <AIPopover open={aiOpen} onClose={() => setAiOpen(false)}/>
       <TemplateModal template={templateModal} onClose={() => setTemplateModal(null)} onConfirm={() => {}}/>
