@@ -33,7 +33,10 @@ export default function BrandedHandle({
   offsetY = 0,
   hidden = false,
 }) {
-  if (hidden) return null;
+  // Handles must stay in the DOM in every mode — xyflow uses their measured
+  // positions to route edges. In readonly modes we used to return null, which
+  // blew away every handle and left the edge router unable to find anchors.
+  // Now we keep them mounted but mark them invisible + non-interactive.
   const ringRGB = hexToRGB(color);
   const style = {
     width: 12,
@@ -42,17 +45,11 @@ export default function BrandedHandle({
     border: 'none',
     boxShadow: `0 0 0 2px rgba(255,255,255,0.95), 0 0 0 3px rgba(${ringRGB},0.22), 0 1px 3px rgba(0,0,0,0.12)`,
     transition: 'opacity 150ms ease, transform 150ms ease',
-    cursor: 'crosshair',
+    cursor: hidden ? 'default' : 'crosshair',
     zIndex: 20,
+    visibility: hidden ? 'hidden' : 'visible',
   };
-  // xyflow handles its own positioning per `position` prop; we only adjust the
-  // vertical offset so logic nodes can fan out yes/no handles. Translate via
-  // marginTop so xyflow's coordinate computations still see the handle at the
-  // node edge midpoint (matters for edge anchoring).
   if (offsetY) style.marginTop = offsetY;
-  // alwaysVisible defaults to opacity 1; otherwise we let the parent
-  // .group/node's hover state expose it. xyflow renders Handle as a div with
-  // class react-flow__handle — we add a stable className we can target.
   const className = alwaysVisible
     ? 'branded-handle branded-handle--visible'
     : 'branded-handle';
@@ -63,7 +60,7 @@ export default function BrandedHandle({
       position={position}
       style={style}
       className={className}
-      isConnectable={true}
+      isConnectable={!hidden}
     />
   );
 }

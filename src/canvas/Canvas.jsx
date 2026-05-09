@@ -34,6 +34,7 @@ import {
 
 import { nodesToFlow, edgesToFlow, flowToNode, flowToEdge } from './util/transform.js';
 import { dagreLayout } from './util/layout.js';
+import { CanvasContext } from './util/canvas-context.js';
 import PageNode from './nodes/PageNode.jsx';
 import SourceNode from './nodes/SourceNode.jsx';
 import LogicNode from './nodes/LogicNode.jsx';
@@ -62,7 +63,7 @@ function CanvasInner({
   const initial = DEMO_STATES[demoState] || DEMO_STATES.empty;
 
   const [nodes, setNodes, onNodesChangeXY] = useNodesState(nodesToFlow(initial.nodes));
-  const [edges, setEdges, onEdgesChangeXY] = useEdgesState(edgesToFlow(initial.edges));
+  const [edges, setEdges, onEdgesChangeXY] = useEdgesState(edgesToFlow(initial.edges, initial.nodes));
   const [selectedNodeId, setSelectedNodeId] = useState(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState(null);
 
@@ -82,7 +83,7 @@ function CanvasInner({
   useEffect(() => {
     const s = DEMO_STATES[demoState] || DEMO_STATES.empty;
     setNodes(nodesToFlow(s.nodes));
-    setEdges(edgesToFlow(s.edges));
+    setEdges(edgesToFlow(s.edges, s.nodes));
     setSelectedNodeId(null);
     setSelectedEdgeId(null);
     const t = setTimeout(() => {
@@ -169,29 +170,32 @@ function CanvasInner({
       },
     };
     const k = LOGIC_KIND[kind] || LOGIC_KIND.condition;
-    // inEdge inherits orig's sourceHandle. Only carry it through when the
-    // original source was a logic node — for page/source origins, the only
-    // valid source handle is the default (no id), and propagating a stale
-    // 'yes'/'no' would make xyflow drop the edge.
+    // inEdge enters the new logic node's 'in' target. Source handle comes
+    // from the original edge; if the original source was a page/source it's
+    // 'out', if logic it's 'yes'/'no'/'a'/'b'.
     const origFromNode = nodes.find((n) => n.id === orig.source);
+    const inEdgeSourceHandle =
+      origFromNode?.type === 'logic' ? orig.sourceHandle || 'yes' : 'out';
     const inEdge = {
       id: `e-${orig.source}-${id}-${Date.now()}`,
       source: orig.source,
       target: id,
       type: 'pathStats',
+      sourceHandle: inEdgeSourceHandle,
+      targetHandle: 'in',
       data: {
         volume: orig.data?.volume || 0,
         branch: origFromNode?.type === 'logic' ? (orig.data?.branch || null) : null,
         label: orig.data?.label || null,
       },
     };
-    if (origFromNode?.type === 'logic' && orig.sourceHandle) inEdge.sourceHandle = orig.sourceHandle;
     const outEdge = {
       id: `e-${id}-${orig.target}-${Date.now() + 1}`,
       source: id,
       target: orig.target,
       type: 'pathStats',
       sourceHandle: k.primaryBranch,
+      targetHandle: 'in',
       data: { volume: orig.data?.volume || 0, branch: k.primaryBranch, label: null },
     };
 
@@ -253,39 +257,19 @@ function CanvasInner({
     return map;
   }, [edges]);
 
-  // Decorate node.data with the live callbacks/mode/derived bits the
-  // node components need. Stable references keep xyflow's diff happy.
-  const decoratedNodes = useMemo(() => {
-    return nodes.map((n) => {
-      const decoration = {
-        _mode: mode,
-        _onRemove: removeNodeById,
-      };
-      if (n.type === 'source') {
-        decoration._target = sourceTargets[n.id];
-        decoration._onChangeSource = changeSource;
-      } else if (n.type === 'logic') {
-        decoration._outgoingCount = outgoingCounts[n.id] || 0;
-      }
-      return { ...n, data: { ...n.data, ...decoration } };
-    });
-  }, [nodes, mode, sourceTargets, outgoingCounts, removeNodeById, changeSource]);
-
-  // Thread mode + callbacks into edge.data so PathStatsEdge can switch its
-  // rendering (mid-edge stat pill is Analyse-only) and so the hover chip
-  // can call back to remove the edge or open the insert picker.
-  const decoratedEdges = useMemo(
-    () =>
-      edges.map((e) => ({
-        ...e,
-        data: {
-          ...(e.data || {}),
-          _mode: mode,
-          _onRemove: removeEdgeById,
-          _onInsert: onEdgeInsert,
-        },
-      })),
-    [edges, mode, removeEdgeById, onEdgeInsert],
+  // Mode + callbacks flow through CanvasContext rather than living inside
+  // node.data / edge.data — see canvas-context.js for the rationale.
+  const canvasCtx = useMemo(
+    () => ({
+      mode,
+      onRemoveNode: removeNodeById,
+      onChangeSource: changeSource,
+      onRemoveEdge: removeEdgeById,
+      onInsertEdge: onEdgeInsert,
+      sourceTargets,
+      outgoingCounts,
+    }),
+    [mode, removeNodeById, changeSource, removeEdgeById, onEdgeInsert, sourceTargets, outgoingCounts],
   );
 
   // ───────────────────────── Selection ─────────────────────────
@@ -487,7 +471,7 @@ function CanvasInner({
       // drag from the same handle twice — we want first connection = primary,
       // second = secondary.
       const fromNode = nodes.find((n) => n.id === params.source);
-      let sourceHandle = params.sourceHandle;
+      let sourceHandle = params.sourceHandle || 'out';
       let branch = null;
       if (fromNode?.type === 'logic') {
         const k = LOGIC_KIND[fromNode.data?.kind] || LOGIC_KIND.condition;
@@ -522,7 +506,8 @@ function CanvasInner({
           source: params.source,
           target: params.target,
           type: 'pathStats',
-          sourceHandle: sourceHandle || undefined,
+          sourceHandle,
+          targetHandle: 'in',
           data: { volume: defaultVolume, branch, label: null },
         };
         return [...es, newEdge];
@@ -689,32 +674,34 @@ function CanvasInner({
       )}
 
       {!isEmpty && (
-        <ReactFlow
-          nodes={decoratedNodes}
-          edges={decoratedEdges}
-          onNodesChange={onNodesChangeXY}
-          onEdgesChange={onEdgesChangeXY}
-          onConnect={onConnect}
-          onConnectStart={onConnectStart}
-          onConnectEnd={onConnectEnd}
-          isValidConnection={isValidConnection}
-          onSelectionChange={handleSelectionChange}
-          nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes}
-          defaultEdgeOptions={defaultEdgeOptions}
-          snapToGrid
-          snapGrid={[10, 10]}
-          minZoom={0.4}
-          maxZoom={2}
-          fitView={false}
-          nodesDraggable={mode === 'build' || mode === 'analyse'}
-          nodesConnectable={mode === 'build'}
-          edgesFocusable={mode === 'build'}
-          deleteKeyCode={['Backspace', 'Delete']}
-          proOptions={{ hideAttribution: true }}
-          style={{ background: 'transparent' }}
-          className={connectFromId ? 'is-connecting' : ''}
-        />
+        <CanvasContext.Provider value={canvasCtx}>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChangeXY}
+            onEdgesChange={onEdgesChangeXY}
+            onConnect={onConnect}
+            onConnectStart={onConnectStart}
+            onConnectEnd={onConnectEnd}
+            isValidConnection={isValidConnection}
+            onSelectionChange={handleSelectionChange}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            defaultEdgeOptions={defaultEdgeOptions}
+            snapToGrid
+            snapGrid={[10, 10]}
+            minZoom={0.4}
+            maxZoom={2}
+            fitView={false}
+            nodesDraggable={mode === 'build' || mode === 'analyse'}
+            nodesConnectable={mode === 'build'}
+            edgesFocusable={mode === 'build'}
+            deleteKeyCode={['Backspace', 'Delete']}
+            proOptions={{ hideAttribution: true }}
+            style={{ background: 'transparent' }}
+            className={connectFromId ? 'is-connecting' : ''}
+          />
+        </CanvasContext.Provider>
       )}
 
       <ExportFunnelButton />

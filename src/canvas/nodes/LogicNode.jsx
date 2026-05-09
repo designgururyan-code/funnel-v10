@@ -10,6 +10,7 @@ import {
   Workflow,
 } from '../../App.jsx';
 import BrandedHandle from './BrandedHandle.jsx';
+import { useCanvas } from '../util/canvas-context.js';
 
 /**
  * LogicNode — branching step (Condition or A/B test). Has TWO source handles
@@ -27,13 +28,13 @@ import BrandedHandle from './BrandedHandle.jsx';
  * onConnect if it's not yet assigned.
  */
 export default function LogicNode({ id, data, selected }) {
-  const mode = data._mode || 'build';
+  const { mode, onRemoveNode, outgoingCounts } = useCanvas();
   const readonly = mode !== 'build';
   const kind = LOGIC_KIND[data.kind] || LOGIC_KIND.condition;
   const Ic = data.kind === 'abtest' ? Bars : Workflow;
   const accentColor = data.kind === 'abtest' ? '#F59E0B' : '#7C3AED';
   const VIOLET = accentColor;
-  const branchesUsed = Math.min(data._outgoingCount || 0, 2);
+  const branchesUsed = Math.min(outgoingCounts[id] || 0, 2);
 
   return (
     <div
@@ -43,6 +44,7 @@ export default function LogicNode({ id, data, selected }) {
       {/* target handle — left middle, violet */}
       <BrandedHandle
         type="target"
+        id="in"
         position={Position.Left}
         color={VIOLET}
         alwaysVisible={!readonly}
@@ -63,7 +65,7 @@ export default function LogicNode({ id, data, selected }) {
                 onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => {
                   e.stopPropagation();
-                  data._onRemove && data._onRemove(id);
+                  onRemoveNode(id);
                 }}
               >
                 <X size={11} />

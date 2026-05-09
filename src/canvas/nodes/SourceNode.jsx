@@ -15,6 +15,7 @@ import {
   ChevronRight,
 } from '../../App.jsx';
 import BrandedHandle from './BrandedHandle.jsx';
+import { useCanvas } from '../util/canvas-context.js';
 
 /**
  * SourceNode — xyflow custom node. Visual ported from App.jsx's original
@@ -23,9 +24,9 @@ import BrandedHandle from './BrandedHandle.jsx';
  * through by Canvas.jsx.
  */
 export default function SourceNode({ id, data, selected }) {
-  const mode = data._mode || 'build';
+  const { mode, onRemoveNode, onChangeSource, sourceTargets } = useCanvas();
   const readonly = mode !== 'build';
-  const target = data._target;
+  const target = sourceTargets[id];
   const src = SOURCE_BY_ID[data.src] || SOURCES[0];
   const Ic = src.Icon;
   const count = target?.count || 0;
@@ -69,7 +70,7 @@ export default function SourceNode({ id, data, selected }) {
                 onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => {
                   e.stopPropagation();
-                  data._onRemove && data._onRemove(id);
+                  onRemoveNode(id);
                 }}
               >
                 <X size={11} />
@@ -106,7 +107,7 @@ export default function SourceNode({ id, data, selected }) {
               label={s.name}
               active={s.id === src.id}
               onClick={() => {
-                data._onChangeSource && data._onChangeSource(id, s.id);
+                onChangeSource(id, s.id);
                 setEditOpen(false);
               }}
             />
@@ -220,6 +221,7 @@ export default function SourceNode({ id, data, selected }) {
       {/* source handle — only output, no target. Brand-blue (or the source's color). */}
       <BrandedHandle
         type="source"
+        id="out"
         position={Position.Right}
         color={src.color}
         alwaysVisible={false}

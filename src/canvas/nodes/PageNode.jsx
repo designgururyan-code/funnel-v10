@@ -10,6 +10,7 @@ import {
   Spark,
 } from '../../App.jsx';
 import BrandedHandle from './BrandedHandle.jsx';
+import { useCanvas } from '../util/canvas-context.js';
 
 /**
  * PageNode — xyflow custom node. Visual ported from the original PageNode in
@@ -19,7 +20,7 @@ import BrandedHandle from './BrandedHandle.jsx';
  * functions Canvas threads through under data._mode, data._onRemove, etc.
  */
 export default function PageNode({ id, data, selected }) {
-  const mode = data._mode || 'build';
+  const { mode, onRemoveNode } = useCanvas();
   const readonly = mode !== 'build';
   const baseT = PAGE_TYPE[data.pageType] || PAGE_TYPE.custom;
   const isCustom = data.pageType === 'custom';
@@ -35,9 +36,11 @@ export default function PageNode({ id, data, selected }) {
 
   return (
     <div className="group/node relative" style={{ width: NODE_W.page }}>
-      {/* target handle — left middle, hidden visually but accepts connections */}
+      {/* target handle — left middle, hidden visually but accepts connections.
+         Explicit id="in" matches transform.js + onConnect's targetHandle. */}
       <BrandedHandle
         type="target"
+        id="in"
         position={Position.Left}
         color={t.color}
         alwaysVisible={false}
@@ -58,7 +61,7 @@ export default function PageNode({ id, data, selected }) {
                 onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => {
                   e.stopPropagation();
-                  data._onRemove && data._onRemove(id);
+                  onRemoveNode(id);
                 }}
               >
                 <X size={11} />
@@ -216,9 +219,10 @@ export default function PageNode({ id, data, selected }) {
         })()}
       </div>
 
-      {/* source handle — right middle, brand colour for the page type */}
+      {/* source handle — right middle, brand colour for the page type. */}
       <BrandedHandle
         type="source"
+        id="out"
         position={Position.Right}
         color={t.color}
         alwaysVisible={false}

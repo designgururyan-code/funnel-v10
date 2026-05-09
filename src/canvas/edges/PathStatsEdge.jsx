@@ -14,6 +14,7 @@ import {
   Eye,
   X,
 } from '../../App.jsx';
+import { useCanvas } from '../util/canvas-context.js';
 
 const Plus = ({ size = 11 }) => (
   <svg
@@ -103,15 +104,15 @@ export default function PathStatsEdge({
     borderRadius: 10,
   });
 
+  const { mode, onRemoveEdge, onInsertEdge } = useCanvas();
   const branch = data?.branch || null;
   const stroke = getEdgeStroke(branch, hovered, selected);
-  const mode = data?._mode || 'build';
   const vol = data?.volume || 0;
   const labelStr = (data?.label || '').trim();
   const hasLabel = labelStr.length > 1;
   const buildHover = mode === 'build' && hovered;
-  const onInsert = data?._onInsert;
-  const onRemove = data?._onRemove;
+  const onInsert = onInsertEdge;
+  const onRemove = onRemoveEdge;
 
   // arrow tip orientation — tangent of the smoothstep approaching the target
   // (smoothstep ends are orthogonal to the target side, so we can derive it

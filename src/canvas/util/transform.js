@@ -14,10 +14,19 @@
  * Determine which source handle a logic-node edge should leave from.
  * Logic nodes have two source handles ('yes'/'no' for condition, 'a'/'b' for abtest).
  * The branch field on the edge maps directly to the handle id.
+ *
+ * For non-branch edges (page → page, source → page, page → logic), the source
+ * uses its single 'out' handle. Every target uses 'in'. We set both explicitly
+ * because xyflow looks up handles by string id and missing/undefined handle
+ * lookups can race with re-measurement, transiently failing edge routing.
  */
 const handleForBranch = (branch) => {
   if (branch === 'yes' || branch === 'no' || branch === 'a' || branch === 'b') return branch;
   return null;
+};
+const sourceHandleFor = (nodeType, branch) => {
+  if (nodeType === 'logic') return handleForBranch(branch) || 'yes';
+  return 'out';
 };
 
 export function nodesToFlow(nodes) {
@@ -30,24 +39,28 @@ export function nodesToFlow(nodes) {
   }));
 }
 
-export function edgesToFlow(edges) {
+/**
+ * Build xyflow edges from our format. Caller passes the matching `nodes`
+ * (our format, with `type`) so we can resolve sourceHandle correctly for
+ * logic-node origins (yes/no/a/b) vs page/source origins (out).
+ */
+export function edgesToFlow(edges, nodes) {
   if (!Array.isArray(edges)) return [];
-  return edges.map((e, i) => {
-    const handle = handleForBranch(e.branch);
-    const flow = {
-      id: e.id || `e-${e.from}-${e.to}-${i}`,
-      source: e.from,
-      target: e.to,
-      type: 'pathStats',
-      data: {
-        volume: e.volume ?? 0,
-        branch: e.branch || null,
-        label: e.label || null,
-      },
-    };
-    if (handle) flow.sourceHandle = handle;
-    return flow;
-  });
+  const nodeTypes = {};
+  if (Array.isArray(nodes)) for (const n of nodes) nodeTypes[n.id] = n.type;
+  return edges.map((e, i) => ({
+    id: e.id || `e-${e.from}-${e.to}-${i}`,
+    source: e.from,
+    target: e.to,
+    type: 'pathStats',
+    sourceHandle: sourceHandleFor(nodeTypes[e.from], e.branch),
+    targetHandle: 'in',
+    data: {
+      volume: e.volume ?? 0,
+      branch: e.branch || null,
+      label: e.label || null,
+    },
+  }));
 }
 
 export function flowToNode(flowNode) {
