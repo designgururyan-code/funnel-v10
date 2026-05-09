@@ -63,6 +63,9 @@ const Xicon = ({ size = 11 }) => (
  *              Session C polish
  */
 function getEdgeStroke(branch, hovered, selected) {
+  // A/B test branches mirror the A/B card's amber accent. Condition (Y/N)
+  // branches stay violet to match their card. Default edges are brand-blue.
+  if (branch === 'a' || branch === 'b') return hovered || selected ? '#B45309' : '#F59E0B';
   if (branch) return hovered || selected ? '#6D28D9' : '#7C3AED';
   return hovered || selected ? '#005A9A' : '#006CB5';
 }
