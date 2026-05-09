@@ -2445,38 +2445,50 @@ function EdgeOverlays({ nodes, edges, zoom, hovered, onHover, onRemove, onInsert
                       style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}>{labelStr}</text>
               </g>
             )}
-            {/* Mid-edge pill — stacked layout per client feedback. The
-               `pillOffsetY` from the precomputation pass shifts pills
-               vertically when neighbors collide. */}
+            {/* Mid-edge pill — stacked content INSIDE one cohesive white pill.
+               The % sits as the headline (bold, top), the unique count + label
+               sit below (smaller, secondary). Green stats button hangs off the
+               right edge as an overlapping attachment, like a notification dot.
+               `pillOffsetY` from collision pass shifts pills vertically when
+               neighbors are too close. */}
             {showStats && (() => {
               const pct = rate != null ? `${rate}%` : '—';
               const uniques = formatVolume(vol);
               const cy = geo.my + (hasLabel ? 14 : 0) + pillOffsetY;
               const isOpen = statsOpen === i;
+              // Pill dimensions — wide enough for the longer of the two lines
+              const pillW = 96;
+              const pillH = 38;
               return (
                 <g key={`pill-${i}`} transform={`translate(${geo.mx}, ${cy})`} style={{ pointerEvents: 'auto' }}>
-                  {/* % above the line — bold, no background, just text */}
-                  <text x="0" y="-8" textAnchor="middle" fontSize="14" fontWeight="700" fill="#0F172A"
+                  {/* white pill container — rounded, soft shadow, 1px border */}
+                  <rect x={-pillW/2} y={-pillH/2} width={pillW} height={pillH} rx={pillH/2}
+                        fill="white" stroke="#E5E7EB" strokeWidth="1"
+                        style={{ filter: 'drop-shadow(0 1px 3px rgba(15,23,42,0.08))', pointerEvents: 'none' }}/>
+                  {/* line 1 — bold % headline */}
+                  <text x="0" y="-3" textAnchor="middle" fontSize="13" fontWeight="700" fill="#0F172A"
                         style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif', pointerEvents: 'none' }}>
                     {pct}
                   </text>
-                  {/* unique count below — small people-icon + number + UNIQUE */}
-                  <foreignObject x="-50" y="6" width="100" height="20" style={{ overflow: 'visible' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', height: '20px', pointerEvents: 'none' }}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '14px', height: '14px', color: '#006CB5' }}>
-                        <UsersIcon size={11}/>
+                  {/* line 2 — unique count with people icon */}
+                  <foreignObject x={-pillW/2} y="2" width={pillW} height="16" style={{ overflow: 'visible' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', height: '16px', pointerEvents: 'none' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '11px', height: '11px', color: '#006CB5' }}>
+                        <UsersIcon size={10}/>
                       </span>
-                      <span style={{ fontSize: '11px', fontWeight: 700, color: '#006CB5', fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}>{uniques}</span>
-                      <span style={{ fontSize: '10px', fontWeight: 500, color: '#94A3B8', letterSpacing: '0.04em' }}>UNIQUE</span>
+                      <span style={{ fontSize: '10.5px', fontWeight: 700, color: '#006CB5', fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}>{uniques}</span>
+                      <span style={{ fontSize: '9.5px', fontWeight: 500, color: '#94A3B8', letterSpacing: '0.04em' }}>UNIQUE</span>
                     </div>
                   </foreignObject>
-                  {/* embedded green stats button — to the right of the pill */}
-                  <foreignObject x="32" y="-12" width="22" height="22" style={{ overflow: 'visible' }}>
+                  {/* green stats button — overlapping attachment, sits half-outside
+                     the pill on the right edge like a notification badge */}
+                  <foreignObject x={pillW/2 - 11} y="-11" width="22" height="22" style={{ overflow: 'visible' }}>
                     <div style={{ width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <button onClick={(ev) => { ev.stopPropagation(); setStatsOpen(isOpen ? null : i); }}
                         title="Path stats"
-                        className="w-[18px] h-[18px] inline-flex items-center justify-center rounded-full bg-good text-white hover:bg-good-deep transition-colors shadow-xs">
-                        <TrendingUp size={10}/>
+                        className="w-[20px] h-[20px] inline-flex items-center justify-center rounded-full bg-good text-white hover:bg-good-deep transition-colors"
+                        style={{ boxShadow: '0 0 0 2px white, 0 1px 3px rgba(15,23,42,0.18)' }}>
+                        <TrendingUp size={11}/>
                       </button>
                     </div>
                   </foreignObject>
@@ -2515,9 +2527,10 @@ function EdgeOverlays({ nodes, edges, zoom, hovered, onHover, onRemove, onInsert
         const drop = Math.max(0, 100 - conv);
         return (
           <g transform={`translate(${geo.mx}, ${cy})`} style={{ pointerEvents: 'auto' }}>
-            <foreignObject x={-130} y={18} width={260} height={300} style={{ overflow: 'visible' }}>
+            <foreignObject x={-130} y={18} width={260} height={340} style={{ overflow: 'visible' }}>
               <div onClick={(ev) => ev.stopPropagation()}
-                className="ctx-menu w-[260px] bg-white rounded-lg shadow-menu overflow-hidden">
+                className="ctx-menu w-[260px] bg-white rounded-lg shadow-menu overflow-hidden"
+                style={{ position: 'relative', zIndex: 9999 }}>
                 <div className="px-3 py-2.5 bg-good-soft border-b border-good/30 flex items-center gap-2">
                   <span className="w-5 h-5 rounded-full bg-good text-white inline-flex items-center justify-center shrink-0">
                     <TrendingUp size={10}/>
@@ -2533,25 +2546,24 @@ function EdgeOverlays({ nodes, edges, zoom, hovered, onHover, onRemove, onInsert
                     <X size={11}/>
                   </button>
                 </div>
+                {/* Highlight strip — unique visitor count + percent prominently
+                   at the top of the body, matching the on-edge pill but bigger. */}
+                <div className="px-3 pt-3 pb-2 flex items-center justify-between border-b border-line-soft">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded inline-flex items-center justify-center" style={{ background: '#E6F0F9', color: '#006CB5' }}>
+                      <UsersIcon size={11}/>
+                    </span>
+                    <div>
+                      <div className="text-[14px] font-bold tabular-nums leading-none" style={{ color: '#006CB5' }}>{vol.toLocaleString()}</div>
+                      <div className="text-[9.5px] uppercase tracking-wider text-ink-soft mt-0.5">Unique visitors</div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[14px] font-bold tabular-nums leading-none text-good-deep">{conv}%</div>
+                    <div className="text-[9.5px] uppercase tracking-wider text-ink-soft mt-0.5">Conversion</div>
+                  </div>
+                </div>
                 <div className="p-3 grid grid-cols-2 gap-2">
-                  <div className="flex items-start gap-1.5 min-w-0">
-                    <span className="w-4 h-4 rounded inline-flex items-center justify-center mt-0.5 shrink-0" style={{ background: '#E6F0F9', color: '#006CB5' }}>
-                      <Eye size={9}/>
-                    </span>
-                    <div className="min-w-0">
-                      <div className="text-[9.5px] uppercase tracking-wider text-ink-soft">Visitors</div>
-                      <div className="text-[12.5px] font-semibold tabular-nums leading-tight" style={{ color: '#006CB5' }}>{vol.toLocaleString()}</div>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-1.5 min-w-0">
-                    <span className="w-4 h-4 rounded inline-flex items-center justify-center mt-0.5 shrink-0" style={{ background: '#ECFDF5', color: '#10B981' }}>
-                      <TrendingUp size={9}/>
-                    </span>
-                    <div className="min-w-0">
-                      <div className="text-[9.5px] uppercase tracking-wider text-ink-soft">Conversion</div>
-                      <div className="text-[12.5px] font-semibold text-good-deep tabular-nums leading-tight">{conv}%</div>
-                    </div>
-                  </div>
                   <div className="flex items-start gap-1.5 min-w-0">
                     <span className="w-4 h-4 rounded inline-flex items-center justify-center mt-0.5 shrink-0" style={{ background: '#FEE2E2', color: '#DC2626' }}>
                       <Activity size={9}/>
