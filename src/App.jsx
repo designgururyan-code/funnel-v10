@@ -311,8 +311,19 @@ function TopbarWired({ project, onProjectChange, mode, onModeChange }) {
   return (
     <header className="h-12 px-3 bg-white border-b border-line flex items-center justify-between shrink-0 relative">
       <div className="flex items-center gap-2 min-w-0">
-        <a href="#" className="shrink-0">
-          <div className="w-7 h-7 rounded-full bg-genesis flex items-center justify-center text-white font-bold text-xs">E</div>
+        <a href="#" className="shrink-0 inline-flex items-center justify-center w-7 h-7" title="Estage">
+          {/* Inline Estage logo — the official mark, scaled to fit the topbar slot. */}
+          <svg viewBox="0 0 68 68" width="28" height="28" xmlns="http://www.w3.org/2000/svg" fill="none">
+            <mask id="estagemask" maskUnits="userSpaceOnUse" x="8" y="8" width="52" height="52">
+              <path d="m60 34c0 14.3594-11.6406 26-26 26s-26-11.6406-26-26 11.6406-26 26-26 26 11.6406 26 26z" fill="#fff"/>
+            </mask>
+            <circle cx="34" cy="34" r="26" fill="#fff"/>
+            <path d="m33.8161 67.6322c-18.6466 0-33.8161-15.1695-33.8161-33.8161s15.1695-33.8161 33.8161-33.8161 33.8161 15.1695 33.8161 33.8161-15.1695 33.8161-33.8161 33.8161zm0-62.77228c-15.9625 0-28.95618 12.99368-28.95618 28.95618s12.99368 28.9562 28.95618 28.9562 28.9562-12.9937 28.9562-28.9562-12.9937-28.95618-28.9562-28.95618z" fill="#006cb5"/>
+            <g clipRule="evenodd" fillRule="evenodd" mask="url(#estagemask)">
+              <path d="m19 49.8335h30.5v-2.008-3.6196h-24.9419v-7.9434h24.9419v-2.0077-3.6195h-30.5z" fill="#0F172A"/>
+              <path d="m19 23.3773h30.5v-2.0078-3.6195h-30.5z" fill="#006cb5"/>
+            </g>
+          </svg>
         </a>
         <button
           ref={projAnchor}
@@ -1432,7 +1443,8 @@ function EmptyCanvas({ onJumpToTemplates, onJumpToPages }) {
           <WizardStep n={1} accent="#10B981" tint="#ECFDF5" Icon={Globe}
             title="Add a traffic source"
             sub="Where do visitors come from? Facebook, Email, YouTube and more."
-            cta="Add source" onClick={onJumpToPages}/>
+            cta="Add source"
+            onClick={() => window.dispatchEvent(new CustomEvent('sidebar-focus', { detail: { section: 'sources' } }))}/>
           <WizardStep n={2} accent="#006CB5" tint="#E6F0F9" Icon={FileIcon}
             title="Add your first page"
             sub="Landing page, lead form, sales page, checkout, thank you."
@@ -1977,7 +1989,7 @@ function LogicNode({ node, selected, onSelect, onDragStart, onConnectStart, onRe
   const readonly = mode !== 'build';
   const kind = LOGIC_KIND[node.data.kind] || LOGIC_KIND.condition;
   const Ic = node.data.kind === 'abtest' ? Bars : Workflow;
-  const accentColor = node.data.kind === 'abtest' ? '#F59E0B' : accentColor;
+  const accentColor = node.data.kind === 'abtest' ? '#F59E0B' : '#7C3AED';
   const VIOLET = accentColor;
   /* meter showing how many of the 2 branches are wired */
   const branchesUsed = Math.min(outgoingCount || 0, 2);
@@ -5054,8 +5066,8 @@ function BuildWithAIChat({ open, onClose }) {
           <ChevronLeft size={14}/>
         </button>
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <span className="w-7 h-7 rounded-md bg-violet-soft text-violet flex items-center justify-center ai-ripple shrink-0">
-            <Spark size={13} className="ai-breathe-icon"/>
+          <span className="w-7 h-7 rounded-md bg-violet-soft text-violet flex items-center justify-center shrink-0">
+            <Spark size={13}/>
           </span>
           <div className="flex-1 min-w-0">
             <div className="text-[12.5px] font-semibold text-ink leading-tight">Build with AI</div>
@@ -5064,28 +5076,32 @@ function BuildWithAIChat({ open, onClose }) {
         </div>
       </div>
 
-      {/* Same Section components as the regular sidebar — uppercase labels,
-         chevron, count pill — and now FULLY FUNCTIONAL. They open and collapse
-         normally. The chat fills whatever space is left below. */}
-      <div className="border-b border-line-soft shrink-0">
-        <Section title="Add Pages"        count={12} open={sectionsOpen.pages}     onToggle={() => toggleSection('pages')}>
-          <div className="px-4 py-2 text-[11px] text-ink-soft leading-relaxed">
-            Drag any page from your project to drop it on the canvas, or use Quick add above.
+      {/* Same Section components as the regular sidebar — and they render
+         the SAME content (PageRow / SourceRow / TemplateCard rows). The only
+         difference vs the real sidebar is that drag is mocked and the chat
+         takes over the bottom of the panel. */}
+      <div className="border-b border-line-soft shrink-0 max-h-[40%] overflow-y-auto scroll-thin">
+        <Section title="Add Pages" count={Object.keys(PAGES).length}
+          open={sectionsOpen.pages} onToggle={() => toggleSection('pages')}>
+          {Object.values(PAGES).slice(0, 6).map(p => (
+            <PageRow key={p.id} page={p} draggable={false} active={false}
+              onClick={() => {}} onContextMenu={() => {}}/>
+          ))}
+        </Section>
+        <Section title="Current Funnel" count={0}
+          open={sectionsOpen.inFunnel} onToggle={() => toggleSection('inFunnel')}>
+          <div className="px-4 py-3 text-[11px] text-ink-soft leading-relaxed">
+            No pages added yet. Use the chat below or drag from Add Pages.
           </div>
         </Section>
-        <Section title="Current Funnel"   count={0}  open={sectionsOpen.inFunnel}  onToggle={() => toggleSection('inFunnel')}>
-          <div className="px-4 py-2 text-[11px] text-ink-soft leading-relaxed">
-            Pages you've added to this funnel will appear here.
-          </div>
+        <Section title="Traffic" count={SOURCES.length}
+          open={sectionsOpen.sources} onToggle={() => toggleSection('sources')}>
+          {SOURCES.slice(0, 6).map(s => <SourceRow key={s.id} source={s} inFunnel={false}/>)}
         </Section>
-        <Section title="Traffic"          count={9}  open={sectionsOpen.sources}   onToggle={() => toggleSection('sources')}>
-          <div className="px-4 py-2 text-[11px] text-ink-soft leading-relaxed">
-            Connect Facebook, Email, Google Ads and more to send traffic into the funnel.
-          </div>
-        </Section>
-        <Section title="Funnel Templates" count={7}  open={sectionsOpen.templates} onToggle={() => toggleSection('templates')} last>
-          <div className="px-4 py-2 text-[11px] text-ink-soft leading-relaxed">
-            Start from a proven funnel structure: Lead Magnet, Webinar, Sales Funnel, more.
+        <Section title="Funnel Templates" count={TEMPLATES.length}
+          open={sectionsOpen.templates} onToggle={() => toggleSection('templates')} last>
+          <div className="space-y-1.5 py-1">
+            {TEMPLATES.slice(0, 4).map(t => <TemplateCard key={t.id} tpl={t} onClick={() => {}}/>)}
           </div>
         </Section>
       </div>
@@ -5127,18 +5143,52 @@ function BuildWithAIChat({ open, onClose }) {
    Completed learnings. Each item is clickable and would open the suggestion
    modal in a real product. */
 function OptimiseEmptyState({ funnel }) {
-  const URGENT = [
-    { name: 'Landing page drop-off', card: 'May Promo Landing', impact: 'High', why: '76% drop to Lead Form' },
-    { name: 'Checkout abandonment',   card: 'Cart',              impact: 'High', why: 'Below benchmark' },
-  ];
-  const GROWTH = [
-    { name: 'Headline A/B test',  card: 'Landing Page', impact: 'Med',  lift: '+8–14%' },
-    { name: 'Pricing layout test', card: 'Sales Page',  impact: 'Med',  lift: '+3–6%'  },
-    { name: 'Form length test',    card: 'Lead Form',   impact: 'High', lift: '+11%'   },
-  ];
-  const DONE = [
-    { name: 'CTA color test',  card: 'Landing Page', result: '+8% lift', date: 'Apr 28' },
-  ];
+  // Make the queue stateful so the audit interaction can append + dismiss
+  // suggestions live.
+  const [urgent, setUrgent] = useState([
+    { id: 'u1', name: 'Landing page drop-off', card: 'May Promo Landing', impact: 'High', why: '76% drop to Lead Form' },
+    { id: 'u2', name: 'Checkout abandonment',   card: 'Cart',              impact: 'High', why: 'Below benchmark' },
+  ]);
+  const [growth, setGrowth] = useState([
+    { id: 'g1', name: 'Headline A/B test',  card: 'Landing Page', impact: 'Med',  lift: '+8–14%' },
+    { id: 'g2', name: 'Pricing layout test', card: 'Sales Page',  impact: 'Med',  lift: '+3–6%'  },
+    { id: 'g3', name: 'Form length test',    card: 'Lead Form',   impact: 'High', lift: '+11%'   },
+  ]);
+  const [other, setOther] = useState([]);
+  const [done, setDone] = useState([
+    { id: 'd1', name: 'CTA color test',  card: 'Landing Page', result: '+8% lift', date: 'Apr 28' },
+  ]);
+  const [auditing, setAuditing] = useState(false);
+  const [auditProgress, setAuditProgress] = useState(0);
+  const runAudit = () => {
+    if (auditing) return;
+    setAuditing(true);
+    setAuditProgress(0);
+    let p = 0;
+    const tick = setInterval(() => {
+      p += 8 + Math.random() * 12;
+      if (p >= 100) {
+        p = 100;
+        clearInterval(tick);
+        // Inject new suggestions after the bar fills
+        setTimeout(() => {
+          setUrgent(u => [...u, { id: 'u-' + Date.now(), name: 'Trim hero copy length', card: 'May Promo Landing', impact: 'High', why: 'Above-fold copy too dense' }]);
+          setGrowth(g => [...g, { id: 'g-' + Date.now(), name: 'Test trust-badges row', card: 'Sales Page', impact: 'Med', lift: '+5–9%' }]);
+          setOther(o => [...o, { id: 'o-' + Date.now(), name: 'Add exit-intent popup', card: 'May Promo Landing', impact: 'Low', lift: '+2–4%' }]);
+          setAuditing(false);
+        }, 200);
+      }
+      setAuditProgress(p);
+    }, 110);
+  };
+  const dismiss = (kind, id) => {
+    if (kind === 'urgent') setUrgent(u => u.filter(x => x.id !== id));
+    if (kind === 'growth') setGrowth(g => g.filter(x => x.id !== id));
+    if (kind === 'other')  setOther(o => o.filter(x => x.id !== id));
+    if (kind === 'done')   setDone(d => d.filter(x => x.id !== id));
+  };
+  // Backwards-compat aliases for the existing render
+  const URGENT = urgent, GROWTH = growth, DONE = done;
 
   return (
     <div className="flex-1 min-h-0 flex flex-col">
@@ -5153,64 +5203,114 @@ function OptimiseEmptyState({ funnel }) {
 
       <div className="flex-1 min-h-0 overflow-y-auto scroll-thin">
         {/* Urgent fixes */}
-        <OptimiseSection title="Urgent fixes" accent="bg-bad text-white" count={URGENT.length}>
-          {URGENT.map((t, i) => (
-            <OptimiseRow key={i} title={t.name} subtitle={`on ${t.card} · ${t.why}`} pill={t.impact} pillKind="bad"/>
-          ))}
-        </OptimiseSection>
+        {URGENT.length > 0 && (
+          <OptimiseSection title="Urgent fixes" count={URGENT.length}>
+            {URGENT.map(t => (
+              <OptimiseRow key={t.id} title={t.name} subtitle={`on ${t.card} · ${t.why}`}
+                pill={t.impact} pillKind="bad"
+                onDismiss={() => dismiss('urgent', t.id)}/>
+            ))}
+          </OptimiseSection>
+        )}
         {/* Growth tests */}
-        <OptimiseSection title="Growth tests" accent="bg-violet text-white" count={GROWTH.length}>
-          {GROWTH.map((t, i) => (
-            <OptimiseRow key={i} title={t.name} subtitle={`on ${t.card} · ${t.lift} estimated`} pill={t.impact} pillKind="violet"/>
-          ))}
-        </OptimiseSection>
+        {GROWTH.length > 0 && (
+          <OptimiseSection title="Growth tests" count={GROWTH.length}>
+            {GROWTH.map(t => (
+              <OptimiseRow key={t.id} title={t.name} subtitle={`on ${t.card} · ${t.lift} estimated`}
+                pill={t.impact} pillKind="violet"
+                onDismiss={() => dismiss('growth', t.id)}/>
+            ))}
+          </OptimiseSection>
+        )}
+        {/* Other suggestions — appears after Run audit fills it in */}
+        {other.length > 0 && (
+          <OptimiseSection title="Other suggestions" count={other.length}>
+            {other.map(t => (
+              <OptimiseRow key={t.id} title={t.name} subtitle={`on ${t.card} · ${t.lift || t.why || ''}`}
+                pill={t.impact} pillKind="violet"
+                onDismiss={() => dismiss('other', t.id)}/>
+            ))}
+          </OptimiseSection>
+        )}
         {/* Completed learnings */}
-        <OptimiseSection title="Completed learnings" accent="bg-good text-white" count={DONE.length} last>
-          {DONE.map((t, i) => (
-            <OptimiseRow key={i} title={t.name} subtitle={`on ${t.card} · ${t.date}`} pill={t.result} pillKind="good"/>
-          ))}
-        </OptimiseSection>
+        {DONE.length > 0 && (
+          <OptimiseSection title="Completed learnings" count={DONE.length} last>
+            {DONE.map(t => (
+              <OptimiseRow key={t.id} title={t.name} subtitle={`on ${t.card} · ${t.date}`}
+                pill={t.result} pillKind="good"
+                onDismiss={() => dismiss('done', t.id)}/>
+            ))}
+          </OptimiseSection>
+        )}
       </div>
 
-      <div className="px-3 py-2.5 border-t border-line-soft bg-surface-sub flex items-center gap-2 shrink-0">
-        <span className="w-7 h-7 rounded-md bg-violet-soft text-violet flex items-center justify-center ai-ripple">
-          <Spark size={13} className="ai-breathe-icon"/>
-        </span>
-        <span className="text-[11.5px] text-ink-soft flex-1 leading-snug">Run an AI audit to discover more opportunities.</span>
-        <button className="h-7 px-2.5 inline-flex items-center text-[11.5px] font-semibold text-violet hover:bg-violet-soft rounded transition-colors">
-          Run audit
-        </button>
+      {/* Audit footer — pill turns into a progress bar while running */}
+      <div className="px-3 py-2.5 border-t border-line-soft bg-surface-sub shrink-0">
+        {auditing ? (
+          <div>
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="w-7 h-7 rounded-md bg-violet-soft text-violet flex items-center justify-center ai-ripple">
+                <Spark size={13} className="ai-breathe-icon"/>
+              </span>
+              <span className="text-[11.5px] text-ink font-medium flex-1">Running AI audit…</span>
+              <span className="text-[10.5px] text-ink-soft tabular-nums">{Math.round(auditProgress)}%</span>
+            </div>
+            <div className="h-1.5 bg-surface-muted rounded-full overflow-hidden">
+              <div className="h-full bg-violet rounded-full transition-all duration-150" style={{ width: auditProgress + '%' }}/>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <span className="w-7 h-7 rounded-md bg-violet-soft text-violet flex items-center justify-center ai-ripple">
+              <Spark size={13} className="ai-breathe-icon"/>
+            </span>
+            <span className="text-[11.5px] text-ink-soft flex-1 leading-snug">Run an AI audit to discover more opportunities.</span>
+            <button onClick={runAudit}
+              className="h-7 px-2.5 inline-flex items-center text-[11.5px] font-semibold text-violet hover:bg-violet-soft rounded transition-colors">
+              Run audit
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 function OptimiseSection({ title, accent, count, last, children }) {
+  // Match the standard sidebar Section header style: 10.5px semibold,
+  // uppercase, tracking-wider, ink-soft. Count pill kept but muted.
   return (
     <div className={`${last ? '' : 'border-b border-line-soft'}`}>
-      <div className="px-4 py-2 flex items-center gap-2">
-        <span className={`text-[9px] font-bold uppercase tracking-wider ${accent} px-1.5 py-0.5 rounded`}>{count}</span>
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-ink">{title}</span>
+      <div className="px-4 pt-3.5 pb-2 flex items-center gap-2">
+        <span className="text-[10.5px] font-semibold uppercase tracking-wider text-ink-soft">{title}</span>
+        <span className="text-[10.5px] font-medium text-ink-soft tabular-nums bg-surface-muted px-1.5 py-0.5 rounded">{count}</span>
       </div>
-      <div>{children}</div>
+      <div className="pb-2">{children}</div>
     </div>
   );
 }
 
-function OptimiseRow({ title, subtitle, pill, pillKind }) {
+function OptimiseRow({ title, subtitle, pill, pillKind, onDismiss }) {
   const pillClass = {
     bad:    'bg-bad-soft text-bad-deep',
     violet: 'bg-violet-soft text-violet',
     good:   'bg-good-soft text-good-deep',
   }[pillKind] || 'bg-surface-sub text-ink';
   return (
-    <button className="w-full px-4 py-2 flex items-start gap-2 hover:bg-surface-sub transition-colors text-left">
+    <div className="group/row w-full px-4 py-2 flex items-start gap-2 hover:bg-surface-sub transition-colors cursor-pointer">
       <div className="flex-1 min-w-0">
         <div className="text-[12px] font-medium text-ink truncate">{title}</div>
         <div className="text-[10.5px] text-ink-soft mt-0.5 truncate">{subtitle}</div>
       </div>
       <span className={`text-[10px] font-semibold rounded px-1.5 py-px ${pillClass} shrink-0`}>{pill}</span>
-    </button>
+      {onDismiss && (
+        <button onClick={(e) => { e.stopPropagation(); onDismiss(); }}
+          title="Dismiss"
+          className="w-4 h-4 inline-flex items-center justify-center rounded text-ink-soft hover:text-bad-deep hover:bg-bad-soft transition-colors opacity-0 group-hover/row:opacity-100 shrink-0">
+          <X size={10}/>
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -5243,6 +5343,14 @@ export default function App() {
     const handler = () => setAiChatOpen(true);
     window.addEventListener('open-build-ai', handler);
     return () => window.removeEventListener('open-build-ai', handler);
+  }, []);
+  useEffect(() => {
+    const handler = (e) => {
+      const sec = e?.detail?.section;
+      if (sec) setFocusSection(sec);
+    };
+    window.addEventListener('sidebar-focus', handler);
+    return () => window.removeEventListener('sidebar-focus', handler);
   }, []);
   const [project, setProject] = useState(PROJECTS[0]);
   const [funnel, setFunnel] = useState(FUNNELS[0]);

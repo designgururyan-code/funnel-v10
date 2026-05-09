@@ -366,3 +366,50 @@ input[type="range"] {
 [class*="hover:shadow-"]:not(input):not(textarea):not(select):not([draggable="true"]):not(form) {
   cursor: pointer;
 }
+
+
+/* =====================================================================
+   Cursor fixes — Round 2.
+   SVG-rendered buttons (circles, foreign objects) and nested children
+   sometimes don't inherit cursor:pointer reliably. Force it.
+   ===================================================================== */
+
+/* SVG interactive elements — circles, paths, polygons used as buttons */
+svg [role="button"],
+svg button,
+foreignObject button,
+foreignObject [role="button"] {
+  cursor: pointer !important;
+}
+
+/* Children of buttons should inherit pointer (not text, not auto) */
+button > *,
+button > * > *,
+[role="button"] > *,
+[role="button"] > * > * {
+  cursor: inherit;
+}
+
+/* Rows in the sidebar — entire row clickable even if inner spans aren't */
+.row-action,
+.group\/row,
+[class*="cursor-grab"] {
+  cursor: pointer;
+}
+[class*="cursor-grab"] {
+  cursor: grab;
+}
+
+/* Override draggable cursor when hovering child buttons inside draggable rows */
+[draggable="true"] button,
+[draggable="true"] [role="button"],
+[draggable="true"] a {
+  cursor: pointer !important;
+}
+
+/* Final catch-all: any element with a class containing "btn" or pointer hint */
+[class*="hover:scale-"],
+[class*="active:scale-"],
+[class*="hover:opacity-"]:not(input):not(textarea):not(select) {
+  cursor: pointer !important;
+}
