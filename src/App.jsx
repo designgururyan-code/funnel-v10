@@ -2145,112 +2145,130 @@ function getFloatingAnchor(node, towardX, towardY, mode, isOutgoing) {
 }
 
 function computeEdgeGeometry(a, b, allNodes, mode, edge) {
-  /* Cubic bezier routing — restored from earlier session.
+  /* Orthogonal routing — replaces the previous bezier curves.
 
-     For each endpoint we pick a "floating anchor" — the side of the card facing
-     the other node's center, so edges emerge from whichever side reduces overall
-     curvature. Control points sit `dist` away from each anchor along its facing
-     direction; the resulting cubic bezier curves smoothly from source → target.
+     Right-angle paths read like industry-standard flow tools (Linear, n8n,
+     Whimsical). Each edge:
+       1. Exits the source's right-middle, goes RIGHT for STUB px ("source stub")
+       2. Turns vertically (UP or DOWN) to align with destination's Y
+       3. Goes vertically until aligned with destination's Y
+       4. Turns RIGHT and goes RIGHT to enter destination's left-middle
 
-     Branched edges (yes/no/a/b) shift the source-side cy1 up or down by 45px so
-     two branches leaving the same logic-node connector visibly fan apart.
+     For branched edges (Y/N or A/B), the source-side stub is offset
+     vertically by BRANCH_OFFSET so the two branches visibly fan apart at
+     the source side before turning toward their destinations.
 
-     Obstacle avoidance: sample the bezier at 12 points; if any sample falls
-     inside a non-source/non-target card's bbox (with 12px padding), lift cy1/cy2
-     above (or below) the obstacle stack. Re-detect after each lift; up to 3
-     passes. Direction (above/below) is chosen on the first pass from endpoint
-     geometry to prevent oscillation.
+     The path uses small radius corners (CORNER_R) for a polished feel
+     instead of sharp 90° angles.
 
-     Output: path string + sx/sy/ex/ey, control points cx1/cy1/cx2/cy2, midpoint
-     mx/my (t=0.5), badge anchor bx/by (t=0.85), arrow tangent ang. */
+     Output API stays compatible with bezier version (path, sx/sy/ex/ey,
+     mx/my, bx/by, ang) so callers (collision detection, pill positioning,
+     arrow rendering) work without changes. */
 
-  /* anchors — `a` is source (outgoing), `b` is destination (incoming) */
-  const bCx = b.x + NODE_W[b.type] / 2;
-  const bCy = b.y + getNodeH(b, mode) / 2;
-  const aA = getFloatingAnchor(a, bCx, bCy, mode, true);
-  const aCx = a.x + NODE_W[a.type] / 2;
-  const aCy = a.y + getNodeH(a, mode) / 2;
-  const bA = getFloatingAnchor(b, aCx, aCy, mode, false);
+  const sx = a.x + NODE_W[a.type];
+  const sy = a.y + getNodeH(a, mode) / 2;
+  const ex = b.x;
+  const ey = b.y + getNodeH(b, mode) / 2;
 
-  const sx = aA.x, sy = aA.y;
-  const ex = bA.x, ey = bA.y;
-  /* control point distance — straighter curves, min 80 to avoid over-arcing
-     short edges; 0.5 of edge length for longer ones */
-  const dist = Math.max(80, Math.hypot(ex - sx, ey - sy) * 0.5);
-  let cx1 = sx + aA.ox * dist;
-  let cy1 = sy + aA.oy * dist;
-  let cx2 = ex + bA.ox * dist;
-  let cy2 = ey + bA.oy * dist;
-
-  /* Branch emergence — for branched edges leaving a horizontal anchor, push the
-     source-side control point up (yes/a) or down (no/b) by 45px. Both branches
-     stay violet; the visible fan-out comes entirely from this offset. */
-  if (edge && edge.branch && Math.abs(aA.ox) > Math.abs(aA.oy)) {
-    if (edge.branch === 'yes' || edge.branch === 'a') cy1 -= 45;
-    if (edge.branch === 'no'  || edge.branch === 'b') cy1 += 45;
+  /* Branch offset — Y/A goes up at the source, N/B goes down. This visually
+     splits the two branches as they leave a logic card. */
+  const BRANCH_OFFSET = 22;
+  let sourceY = sy;
+  if (edge && edge.branch) {
+    if (edge.branch === 'yes' || edge.branch === 'a') sourceY = sy - BRANCH_OFFSET;
+    if (edge.branch === 'no'  || edge.branch === 'b') sourceY = sy + BRANCH_OFFSET;
   }
 
-  /* Iterative obstacle avoidance — sample bezier, find blockers, lift control
-     points clear, repeat up to 3 times. */
-  const PAD = 12;
-  const CLEARANCE = 40;
-  const findObstacles = () => allNodes.filter(n => {
-    if (n.id === a.id || n.id === b.id) return false;
-    const nw = NODE_W[n.type], nh = getNodeH(n, mode);
-    for (let i = 1; i < 12; i++) {
-      const t = i / 12;
-      const mt = 1 - t;
-      const x = Math.pow(mt, 3) * sx + 3 * Math.pow(mt, 2) * t * cx1 + 3 * mt * Math.pow(t, 2) * cx2 + Math.pow(t, 3) * ex;
-      const y = Math.pow(mt, 3) * sy + 3 * Math.pow(mt, 2) * t * cy1 + 3 * mt * Math.pow(t, 2) * cy2 + Math.pow(t, 3) * ey;
-      if (x >= n.x - PAD && x <= n.x + nw + PAD && y >= n.y - PAD && y <= n.y + nh + PAD) return true;
-    }
-    return false;
-  });
+  const STUB = 30;       /* horizontal segment length at source + destination */
+  const CORNER_R = 6;    /* corner radius for polished bends */
+  const GAP = 12;        /* clearance before destination — same as old bezier */
 
-  let direction = null;
-  for (let pass = 0; pass < 3; pass++) {
-    const obstacles = findObstacles();
-    if (!obstacles.length) break;
-    if (direction === null) {
-      const maxObstacleBottom = Math.max(...obstacles.map(o => o.y + getNodeH(o, mode)));
-      direction = (sy > maxObstacleBottom && ey > maxObstacleBottom) ? 'below' : 'above';
-    }
-    if (direction === 'above') {
-      const minObstacleY = Math.min(...obstacles.map(o => o.y));
-      const apexY = minObstacleY - CLEARANCE * (pass + 1);
-      cy1 = Math.min(cy1, apexY);
-      cy2 = Math.min(cy2, apexY);
+  /* Path waypoints:
+       (sx, sy)         — exit source center vertically (then ramp up/down to sourceY if branched)
+       (sx, sourceY)    — branched offset (or same as sy)
+       (sx + STUB, sourceY)  — end of source stub
+       (midX, sourceY)  — start of vertical run
+       (midX, ey)       — end of vertical run
+       (ex - GAP, ey)   — destination stub start
+       (ex - GAP, ey)   — arrow lands here (12px short of card edge) */
+
+  const midX = (sx + STUB + ex - STUB) / 2;
+  const exShort = ex - GAP;
+
+  /* Build path with rounded corners. We use SVG arc commands for the bends. */
+  let path = `M ${sx},${sy}`;
+  if (sourceY !== sy) {
+    /* ramp from sy → sourceY with two small arcs (short vertical) */
+    const rampSign = Math.sign(sourceY - sy);
+    path += ` L ${sx},${sourceY - rampSign * CORNER_R}`;
+    path += ` Q ${sx},${sourceY} ${sx + CORNER_R},${sourceY}`;
+  } else {
+    path += ` L ${sx + CORNER_R},${sy}`;
+  }
+  /* horizontal source stub */
+  path += ` L ${midX - CORNER_R},${sourceY}`;
+
+  if (Math.abs(ey - sourceY) > 1) {
+    /* corner: turn from horizontal to vertical */
+    const vSign = Math.sign(ey - sourceY);
+    path += ` Q ${midX},${sourceY} ${midX},${sourceY + vSign * CORNER_R}`;
+    /* vertical run */
+    path += ` L ${midX},${ey - vSign * CORNER_R}`;
+    /* corner: turn from vertical to horizontal */
+    path += ` Q ${midX},${ey} ${midX + CORNER_R},${ey}`;
+  } else {
+    /* nearly aligned — small offset still needs a smooth pass-through */
+    path += ` L ${midX + CORNER_R},${ey}`;
+  }
+  /* horizontal destination stub */
+  path += ` L ${exShort},${ey}`;
+
+  /* Pill position — sits on the horizontal segment between the cards (NOT
+     on the vertical run). Specifically on the destination-side horizontal
+     stub, centered between the vertical run and the destination card edge.
+     This guarantees:
+       - The pill never overlaps the source or destination card
+       - There's always visible connection line on BOTH sides of the pill
+         (between the source and the pill, and between the pill and the
+         destination)
+     If the horizontal stub is too short to fit the pill with margin, fall
+     back to the source-side stub (which is also always horizontal). */
+  const PILL_HALF = 56;       /* half of 112px pill width */
+  const PILL_MARGIN = 12;     /* clearance from card edges and bends */
+  const destStubLen = exShort - midX;
+  const sourceStubLen = midX - sx;
+  let mx, my;
+  if (destStubLen >= PILL_HALF * 2 + PILL_MARGIN * 2) {
+    /* enough room on the destination stub — center pill there */
+    mx = midX + destStubLen / 2;
+    my = ey;
+  } else if (sourceStubLen >= PILL_HALF * 2 + PILL_MARGIN * 2) {
+    /* fallback: source stub */
+    mx = sx + sourceStubLen / 2;
+    my = sourceY;
+  } else {
+    /* extreme case: cards too close, neither stub fits the pill cleanly.
+       Land on whichever is longer and trust collision detection to nudge. */
+    if (destStubLen >= sourceStubLen) {
+      mx = midX + destStubLen / 2;
+      my = ey;
     } else {
-      const maxObstacleBottom = Math.max(...obstacles.map(o => o.y + getNodeH(o, mode)));
-      const apexY = maxObstacleBottom + CLEARANCE * (pass + 1);
-      cy1 = Math.max(cy1, apexY);
-      cy2 = Math.max(cy2, apexY);
-    }
-    if (pass === 0) {
-      const obstacleLeft = Math.min(...obstacles.map(o => o.x));
-      const obstacleRight = Math.max(...obstacles.map(o => o.x + NODE_W[o.type]));
-      if (sx < obstacleLeft) cx1 = Math.max(cx1, obstacleLeft - 20);
-      if (ex > obstacleRight) cx2 = Math.min(cx2, obstacleRight + 20);
+      mx = sx + sourceStubLen / 2;
+      my = sourceY;
     }
   }
 
-  /* gap before destination — 12px clearance reads as "approaching" not "touching" */
-  const gapPadding = 12;
-  const ang = Math.atan2(ey - cy2, ex - cx2);
-  const exShort = ex - Math.cos(ang) * gapPadding;
-  const eyShort = ey - Math.sin(ang) * gapPadding;
-  const path = `M ${sx},${sy} C ${cx1},${cy1} ${cx2},${cy2} ${exShort},${eyShort}`;
+  /* Badge anchor — near destination so Y/N badge reads at entry */
+  const bx = exShort - 24;
+  const by = ey;
 
-  /* midpoint for chip + stats — t=0.5 */
-  const t = 0.5;
-  const mx = Math.pow(1-t,3)*sx + 3*Math.pow(1-t,2)*t*cx1 + 3*(1-t)*Math.pow(t,2)*cx2 + Math.pow(t,3)*ex;
-  const my = Math.pow(1-t,3)*sy + 3*Math.pow(1-t,2)*t*cy1 + 3*(1-t)*Math.pow(t,2)*cy2 + Math.pow(t,3)*ey;
-  /* badge anchor — t=0.85, near destination so branch identity reads at entry */
-  const bt = 0.85;
-  const bx = Math.pow(1-bt,3)*sx + 3*Math.pow(1-bt,2)*bt*cx1 + 3*(1-bt)*Math.pow(bt,2)*cx2 + Math.pow(bt,3)*ex;
-  const by = Math.pow(1-bt,3)*sy + 3*Math.pow(1-bt,2)*bt*cy1 + 3*(1-bt)*Math.pow(bt,2)*cy2 + Math.pow(bt,3)*ey;
+  /* Arrow tangent — always horizontal at destination since we enter from
+     the left going right. ang=0 means straight right. */
+  const ang = 0;
 
-  return { path, sx, sy, ex, ey, cx1, cy1, cx2, cy2, mx, my, bx, by, ang };
+  return { path, sx, sy, ex, ey,
+           cx1: sx + STUB, cy1: sourceY, cx2: midX, cy2: ey,
+           mx, my, bx, by, ang };
 }
 
 
@@ -2618,50 +2636,52 @@ function EdgeOverlays({ nodes, edges, zoom, hovered, onHover, onRemove, onInsert
                     <X size={11}/>
                   </button>
                 </div>
-                {/* Highlight strip — unique visitor count + percent prominently
-                   at the top of the body, matching the on-edge pill but bigger. */}
-                <div className="px-3 pt-3 pb-2 flex items-center justify-between border-b border-line-soft">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-5 h-5 rounded inline-flex items-center justify-center" style={{ background: '#E6F0F9', color: '#006CB5' }}>
-                      <UsersIcon size={11}/>
+                {/* Stats — symmetric 2×2 grid where every cell has the same
+                   structure: colored icon badge + tabular-nums big number +
+                   uppercase label below. All four cells line up vertically. */}
+                <div className="p-3 grid grid-cols-2 gap-x-3 gap-y-3">
+                  {/* Unique visitors */}
+                  <div className="flex items-center gap-2">
+                    <span className="w-7 h-7 rounded-md inline-flex items-center justify-center shrink-0" style={{ background: '#E6F0F9', color: '#006CB5' }}>
+                      <UsersIcon size={13}/>
                     </span>
-                    <div>
+                    <div className="min-w-0">
                       <div className="text-[14px] font-bold tabular-nums leading-none" style={{ color: '#006CB5' }}>{vol.toLocaleString()}</div>
-                      <div className="text-[9.5px] uppercase tracking-wider text-ink-soft mt-0.5">Unique visitors</div>
+                      <div className="text-[9.5px] uppercase tracking-wider text-ink-soft mt-1 leading-none">Unique</div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-[14px] font-bold tabular-nums leading-none text-good-deep">{conv}%</div>
-                    <div className="text-[9.5px] uppercase tracking-wider text-ink-soft mt-0.5">Conversion</div>
-                  </div>
-                </div>
-                <div className="p-3 grid grid-cols-2 gap-2">
-                  <div className="flex items-start gap-1.5 min-w-0">
-                    <span className="w-4 h-4 rounded inline-flex items-center justify-center mt-0.5 shrink-0" style={{ background: '#FEE2E2', color: '#DC2626' }}>
-                      <Activity size={9}/>
+                  {/* Conversion */}
+                  <div className="flex items-center gap-2">
+                    <span className="w-7 h-7 rounded-md inline-flex items-center justify-center shrink-0" style={{ background: '#ECFDF5', color: '#10B981' }}>
+                      <TrendingUp size={13}/>
                     </span>
                     <div className="min-w-0">
-                      <div className="text-[9.5px] uppercase tracking-wider text-ink-soft">Drop-off</div>
-                      <div className="text-[12.5px] font-semibold text-bad-deep tabular-nums leading-tight">{drop}%</div>
+                      <div className="text-[14px] font-bold tabular-nums leading-none text-good-deep">{conv}%</div>
+                      <div className="text-[9.5px] uppercase tracking-wider text-ink-soft mt-1 leading-none">Conversion</div>
                     </div>
                   </div>
-                  <div className="flex items-start gap-1.5 min-w-0">
-                    <span className="w-4 h-4 rounded inline-flex items-center justify-center mt-0.5 shrink-0" style={{ background: '#F3EEFF', color: '#7C3AED' }}>
-                      <Eye size={9}/>
+                  {/* Drop-off */}
+                  <div className="flex items-center gap-2">
+                    <span className="w-7 h-7 rounded-md inline-flex items-center justify-center shrink-0" style={{ background: '#FEE2E2', color: '#DC2626' }}>
+                      <Activity size={13}/>
                     </span>
                     <div className="min-w-0">
-                      <div className="text-[9.5px] uppercase tracking-wider text-ink-soft">Time-to-next</div>
-                      <div className="text-[12.5px] font-semibold tabular-nums leading-tight" style={{ color: '#7C3AED' }}>0:42</div>
+                      <div className="text-[14px] font-bold tabular-nums leading-none text-bad-deep">{drop}%</div>
+                      <div className="text-[9.5px] uppercase tracking-wider text-ink-soft mt-1 leading-none">Drop-off</div>
+                    </div>
+                  </div>
+                  {/* Time-to-next */}
+                  <div className="flex items-center gap-2">
+                    <span className="w-7 h-7 rounded-md inline-flex items-center justify-center shrink-0" style={{ background: '#F3EEFF', color: '#7C3AED' }}>
+                      <Eye size={13}/>
+                    </span>
+                    <div className="min-w-0">
+                      <div className="text-[14px] font-bold tabular-nums leading-none" style={{ color: '#7C3AED' }}>0:42</div>
+                      <div className="text-[9.5px] uppercase tracking-wider text-ink-soft mt-1 leading-none">Time-to-next</div>
                     </div>
                   </div>
                 </div>
-                <div className="px-3 py-2 bg-surface-sub border-t border-line-soft">
-                  <button title="Disconnect this path"
-                    className="w-full h-7 inline-flex items-center justify-center gap-1.5 text-[10.5px] font-semibold text-ink-muted bg-white border border-line rounded hover:border-bad hover:text-bad-deep transition-colors">
-                    <X size={11}/> Disconnect
-                  </button>
-                </div>
-                <div className="px-3 py-1.5 bg-surface-sub border-t border-line-soft text-[10px] text-ink-soft leading-snug">
+                <div className="px-3 py-2 bg-surface-sub border-t border-line-soft text-[10px] text-ink-soft leading-snug">
                   From last 7 days. Drop-off = visitors who didn't reach the next step.
                 </div>
               </div>
@@ -3933,14 +3953,6 @@ function DetailsPage({ node, api, mode }) {
         );
       })()}
 
-      {/* Suggested win — the V5 standout. AI-generated optimisation card */}
-      <SuggestedWin
-        title="Shorten the hero section"
-        body="Visitors who scroll past 60% convert 22% better. Trim two paragraphs."
-        impact="+18%"
-        cta="Apply suggestion"
-      />
-
       {/* Details list */}
       <InspSection label="Details">
         <Row k="Status" v={
@@ -4059,12 +4071,6 @@ function DetailsSource({ node, api, mode }) {
         <Stat label="Cost (7d)" value={node.data.cost ? '$' + node.data.cost : '—'}/>
         <Stat label="Cost per lead" value={cpl} accent={node.data.cpl != null && node.data.cpl < 5 ? 'good' : null}/>
       </InspSection>
-
-      <SuggestedWin
-        title={`Lift ${s.name} match rate`}
-        body="Audience overlap with your buyer list is 71%. Sharpen targeting to lift conversion."
-        impact="+12%"
-        cta="Open audience"/>
 
       <InspSection label="Details">
         <Row k="Platform" v={s.name}/>
