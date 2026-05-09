@@ -10,18 +10,22 @@ import dagre from 'dagre';
  * `node.height` (xyflow populates these after first render). If unavailable,
  * we fall back to NODE_W/NODE_H sizes via the `sizeFor` callback.
  */
-export function dagreLayout(nodes, edges, { sizeFor, hGap = 130, vGap = 60 } = {}) {
+export function dagreLayout(nodes, edges, { sizeFor, hGap = 200, vGap = 90 } = {}) {
   if (!nodes.length) return nodes;
 
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
   g.setGraph({
     rankdir: 'LR',
+    // nodesep is the vertical gap between siblings in the same rank;
+    // ranksep is the horizontal gap between ranks. Generous defaults so
+    // mid-edge stat pills, branch badges and text labels have breathing
+    // room and adjacent cards aren't visually crammed together.
     nodesep: vGap,
     ranksep: hGap,
-    edgesep: 18,
-    marginx: 40,
-    marginy: 40,
+    edgesep: 32,
+    marginx: 60,
+    marginy: 60,
   });
 
   nodes.forEach((n) => {

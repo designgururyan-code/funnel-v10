@@ -607,7 +607,7 @@ function CanvasInner({
       width: NODE_W[n.type] || n.width || 240,
       height: getNodeH({ type: n.type, data: n.data }, mode),
     });
-    const laidOut = dagreLayout(nodes, edges, { sizeFor, hGap: 130, vGap: 60 });
+    const laidOut = dagreLayout(nodes, edges, { sizeFor, hGap: 200, vGap: 90 });
     setNodes(laidOut);
     // fit-to-view after the layout settles so the user sees the result framed
     setTimeout(() => rf.fitView({ padding: 0.18, duration: 320 }), 50);
