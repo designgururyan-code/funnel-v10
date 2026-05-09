@@ -1677,6 +1677,17 @@ function PageNode({ node, selected, mode, onSelect, onDragStart, onConnectStart,
         </div>
       </div>
 
+      {/* Online-now badge — Analyse mode only. Green pulsing dot + live count,
+         floats above the card matching the reference UX. Sits above-left so
+         it doesn't conflict with the remove chip. */}
+      {mode === 'analyse' && (
+        <div className="absolute -top-6 left-2 z-20 inline-flex items-center gap-1.5 pointer-events-none">
+          <span className="w-2 h-2 rounded-full bg-good live-dot shrink-0"/>
+          <span className="text-[10.5px] font-semibold tabular-nums text-good-deep">{node.data.onlineNow ?? 0}</span>
+          <span className="text-[10px] uppercase tracking-wider text-ink-soft">Online</span>
+        </div>
+      )}
+
       {/* Optimise-mode suggestion sparkle — top-right of card.
          Click opens the OptimiseSuggestionModal at bottom-centre. */}
       {mode === 'optimise' && !node.data.dismissed && (
@@ -2087,34 +2098,12 @@ function LogicNode({ node, selected, onSelect, onDragStart, onConnectStart, onRe
         </div>
       </div>
 
-      {/* Single output dot — pixel-positioned (not %) because the wrapper has
-         auto height and Tailwind's top-1/2 was rendering at unexpected positions.
-         NODE_H.logic = 80, so top: 40 = vertical center. Always visible.
-         Drag once = first branch (Y/A); drag again = second (N/B). */}
-      {!readonly && (
-        <span
-          data-connector-dot
-          title="Drag to connect a branch"
-          onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); onConnectStart(node.id, 'right', e); }}
-          style={{
-            position: 'absolute',
-            top: '40px',
-            right: '-9px',
-            width: '18px',
-            height: '18px',
-            borderRadius: '9999px',
-            background: VIOLET,
-            border: '3px solid #ffffff',
-            boxShadow: `0 0 0 2px ${VIOLET}55, 0 2px 6px rgba(0,0,0,0.25)`,
-            cursor: 'crosshair',
-            zIndex: 50,
-            transform: 'translateY(-50%)',
-            transition: 'transform 150ms cubic-bezier(0.32, 0.72, 0, 1)',
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-50%) scale(1.35)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(-50%) scale(1)'; }}
-        />
-      )}
+      {/* Single output dot — uses the same ConnectorDot component as page +
+         source nodes for visual consistency (size, halo, hover). Just violet
+         instead of brand-blue. The wrapper height: NODE_H.logic above is what
+         lets Tailwind's top-1/2 finally compute correctly here. */}
+      <ConnectorDot side="right" nodeId={node.id} onConnectStart={onConnectStart}
+        color={VIOLET} alwaysVisible hidden={readonly}/>
     </div>
   );
 }
@@ -2131,19 +2120,24 @@ function getFloatingAnchor(node, towardX, towardY, mode) {
   const h = getNodeH(node, mode);
   const cx = node.x + w / 2;
   const cy = node.y + h / 2;
+  /* Logic nodes: outgoing edges always anchor at right-middle (where the
+     connector dot sits) so Y and N branches share a visible origin point.
+     The branch-emergence offset on cy1 in computeEdgeGeometry visually fans
+     the two branches apart from this same anchor. */
+  if (node.type === 'logic') {
+    return { x: node.x + w, y: cy, ox: 1, oy: 0 };
+  }
   const dx = towardX - cx;
   const dy = towardY - cy;
   /* pick dominant axis to determine which side faces toward */
   if (Math.abs(dx) >= Math.abs(dy)) {
-    /* horizontal dominant */
     return dx >= 0
-      ? { x: node.x + w, y: cy,         ox:  1, oy:  0 }   /* right */
-      : { x: node.x,     y: cy,         ox: -1, oy:  0 };  /* left  */
+      ? { x: node.x + w, y: cy,         ox:  1, oy:  0 }
+      : { x: node.x,     y: cy,         ox: -1, oy:  0 };
   } else {
-    /* vertical dominant */
     return dy >= 0
-      ? { x: cx,         y: node.y + h, ox:  0, oy:  1 }   /* bottom */
-      : { x: cx,         y: node.y,     ox:  0, oy: -1 };  /* top    */
+      ? { x: cx,         y: node.y + h, ox:  0, oy:  1 }
+      : { x: cx,         y: node.y,     ox:  0, oy: -1 };
   }
 }
 
@@ -2420,30 +2414,38 @@ function EdgeOverlays({ nodes, edges, zoom, hovered, onHover, onRemove, onInsert
                       style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}>{e.label}</text>
               </g>
             )}
-            {/* Mid-pill stats — Analyse mode, edge has volume.
-               Now embeds a green stats button at the right end of the pill so
-               users can tap straight into the path-stats popover (no longer
-               hover-gated). Generous L/R padding for legibility. */}
+            {/* Mid-edge pill — stacked layout per client feedback:
+                 ┌─────────────┐
+                 │    100%     │  ← bold %, large
+                 │ 👤 2 UNIQUE │  ← people icon + count below
+                 └─────────────┘
+               Plus an embedded green stats button still hangs off the right
+               for jumping into the path-stats popover. */}
             {showStats && (() => {
-              const text = rate != null ? `${formatVolume(vol)} · ${rate}%` : formatVolume(vol);
-              // Padding: 14 left + text + 6 spacer + 18 button + 6 right = full width
-              const padL = 14, padR = 6, btnW = 18, spacer = 6;
-              const textW = text.length * 6.0;
-              const w = padL + textW + spacer + btnW + padR;
+              const pct = rate != null ? `${rate}%` : '—';
+              const uniques = formatVolume(vol);
               const cy = geo.my + (hasLabel ? 14 : 0);
               const isOpen = statsOpen === i;
               return (
                 <g key={`pill-${i}`} transform={`translate(${geo.mx}, ${cy})`} style={{ pointerEvents: 'auto' }}>
-                  {/* outer pill — slightly taller for visual weight */}
-                  <rect x={-w/2} y="-13" width={w} height="26" rx="13"
-                        fill="white" stroke="#E5E7EB" strokeWidth="1"
-                        style={{ filter: 'drop-shadow(0 1px 2px rgba(15,23,42,0.06))', pointerEvents: 'none' }}/>
-                  {/* number + percent */}
-                  <text x={-w/2 + padL + textW/2} y="4" textAnchor="middle" fontSize="11" fontWeight="700" fill="#0F172A"
-                        style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif', pointerEvents: 'none' }}>{text}</text>
-                  {/* embedded green stats button — flex centered in foreignObject */}
-                  <foreignObject x={w/2 - padR - btnW} y={-13} width={btnW} height={26} style={{ overflow: 'visible' }}>
-                    <div style={{ width: btnW, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {/* % above the line — bold, no background, just text */}
+                  <text x="0" y="-8" textAnchor="middle" fontSize="14" fontWeight="700" fill="#0F172A"
+                        style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif', pointerEvents: 'none' }}>
+                    {pct}
+                  </text>
+                  {/* unique count below — small people-icon + number + UNIQUE */}
+                  <foreignObject x="-50" y="6" width="100" height="20" style={{ overflow: 'visible' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', height: '20px', pointerEvents: 'none' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '14px', height: '14px', color: '#006CB5' }}>
+                        <UsersIcon size={11}/>
+                      </span>
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: '#006CB5', fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}>{uniques}</span>
+                      <span style={{ fontSize: '10px', fontWeight: 500, color: '#94A3B8', letterSpacing: '0.04em' }}>UNIQUE</span>
+                    </div>
+                  </foreignObject>
+                  {/* embedded green stats button — to the right of the pill */}
+                  <foreignObject x="32" y="-12" width="22" height="22" style={{ overflow: 'visible' }}>
+                    <div style={{ width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <button onClick={(ev) => { ev.stopPropagation(); setStatsOpen(isOpen ? null : i); }}
                         title="Path stats"
                         className="w-[18px] h-[18px] inline-flex items-center justify-center rounded-full bg-good text-white hover:bg-good-deep transition-colors shadow-xs">
@@ -2451,9 +2453,6 @@ function EdgeOverlays({ nodes, edges, zoom, hovered, onHover, onRemove, onInsert
                       </button>
                     </div>
                   </foreignObject>
-                  {/* popover moved out of this edge's <g> so it renders LAST
-                     in the SVG, above any other edge's pills/badges. See
-                     "open popover overlay" block below the edges.map(). */}
                 </g>
               );
             })()}
@@ -2871,6 +2870,7 @@ function Canvas({ mode, demoState, onDemoStateChange, onJumpToTemplates, onJumpT
       },
       getNodes: () => nodes,
       getOutgoingEdges: (nodeId) => edges.map((e, i) => ({ ...e, edgeIdx: i })).filter(e => e.from === nodeId),
+      getIncomingEdges: (nodeId) => edges.map((e, i) => ({ ...e, edgeIdx: i })).filter(e => e.to === nodeId),
       panToNodeByTitle: (title) => {
         const match = nodes.find(n => n.data && n.data.title === title);
         if (!match) return;
@@ -3769,6 +3769,61 @@ function DetailsPage({ node, api, mode }) {
         <Stat label="Avg. time on page" value={avgTime}/>
       </InspSection>
 
+      {/* Traffic snapshot — Analyse mode only. Walks back from this page to
+         find every source feeding it, computes each source's contribution.
+         Shows: source name + colored badge + visitor count + % of total. */}
+      {isAnalyse && api.getIncomingEdges && (() => {
+        const allNodes = api.getNodes ? api.getNodes() : [];
+        // Walk back through the graph BFS-style to find all source nodes
+        // feeding this page (direct OR via intermediate pages/logic).
+        const visited = new Set();
+        const sourceContribs = []; // [{ source, vol }]
+        const walk = (nodeId, vol) => {
+          if (visited.has(nodeId)) return;
+          visited.add(nodeId);
+          const incoming = api.getIncomingEdges(nodeId);
+          incoming.forEach(e => {
+            const fromNode = allNodes.find(n => n.id === e.from);
+            if (!fromNode) return;
+            if (fromNode.type === 'source') {
+              const existing = sourceContribs.find(s => s.id === fromNode.id);
+              if (existing) existing.vol += (e.volume || 0);
+              else sourceContribs.push({
+                id: fromNode.id, node: fromNode, vol: e.volume || 0,
+              });
+            } else {
+              walk(e.from, e.volume || 0);
+            }
+          });
+        };
+        walk(node.id, 0);
+        if (sourceContribs.length === 0) return null;
+        const total = sourceContribs.reduce((sum, s) => sum + s.vol, 0);
+        return (
+          <InspSection label="Traffic snapshot" right={<span className="text-[10px] text-ink-soft">By source</span>}>
+            {sourceContribs.map(c => {
+              const sourceData = SOURCES.find(s => s.id === c.node.data.src);
+              const isCustomSrc = c.node.data.src === 'custom';
+              const name = isCustomSrc ? (c.node.data.customName || 'Custom') : (sourceData?.name || 'Source');
+              const color = isCustomSrc ? (c.node.data.customColor || '#475569') : (sourceData?.color || '#475569');
+              const pct = total ? Math.round((c.vol / total) * 100) : 0;
+              return (
+                <div key={c.id} className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-surface-sub transition-colors">
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }}/>
+                  <span className="text-[12px] font-medium text-ink truncate flex-1">{name}</span>
+                  <span className="text-[11px] text-ink-soft tabular-nums">{c.vol.toLocaleString()} unique</span>
+                  <span className="text-[11px] font-semibold tabular-nums w-9 text-right" style={{ color }}>{pct}%</span>
+                </div>
+              );
+            })}
+            <div className="mt-1 pt-1.5 border-t border-line-soft flex items-center justify-between px-2">
+              <span className="text-[10.5px] text-ink-soft">Total</span>
+              <span className="text-[11px] font-semibold tabular-nums text-ink">{total.toLocaleString()} unique</span>
+            </div>
+          </InspSection>
+        );
+      })()}
+
       {/* Suggested win — the V5 standout. AI-generated optimisation card */}
       <SuggestedWin
         title="Shorten the hero section"
@@ -3862,6 +3917,32 @@ function DetailsSource({ node, api, mode }) {
           </div>
         </InspSection>
       )}
+
+      {/* Ad tracking URL — always visible, regardless of source type. Client
+         flagged this as a frequently-needed field that was previously buried.
+         Includes a copy button + small UTM auto-tag toggle helper. */}
+      <InspSection label="Ad tracking URL">
+        <Field label="Tracking link">
+          <div className="flex items-center gap-1">
+            <input value={node.data.trackingUrl || ''}
+              onChange={(e) => api.updateNodeData(node.id, { trackingUrl: e.target.value })}
+              placeholder="https://example.com?utm_source=…"
+              className="flex-1 h-7 px-2 text-[11px] text-ink bg-surface-sub border border-line-soft rounded outline-none focus:border-brand font-mono"/>
+            <Tip label="Copy" side="top">
+              <button onClick={() => navigator.clipboard?.writeText(node.data.trackingUrl || '')}
+                className="h-7 px-2 inline-flex items-center justify-center rounded text-ink-soft hover:text-ink hover:bg-surface-sub border border-line-soft transition-colors">
+                <Copy size={11}/>
+              </button>
+            </Tip>
+          </div>
+        </Field>
+        <Field label="UTM campaign">
+          <input value={node.data.utmCampaign || ''}
+            onChange={(e) => api.updateNodeData(node.id, { utmCampaign: e.target.value })}
+            placeholder="e.g. spring-launch-2026"
+            className="w-full h-7 px-2 text-[11px] text-ink bg-surface-sub border border-line-soft rounded outline-none focus:border-brand"/>
+        </Field>
+      </InspSection>
 
       <InspSection label="Performance">
         <Stat label="Visitors (7d)" value={visitors.toLocaleString()}/>
