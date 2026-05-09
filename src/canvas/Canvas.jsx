@@ -154,9 +154,7 @@ function CanvasInner({
 
   const insertLogicNode = useCallback((kind) => {
     if (!insertPicker) return;
-    const { edgeId, worldX, worldY } = insertPicker;
-    const orig = edges.find((e) => e.id === edgeId);
-    if (!orig) { setInsertPicker(null); return; }
+    const { worldX, worldY } = insertPicker;
 
     const id = 'logic-' + Date.now();
     const w = NODE_W.logic, hLogic = NODE_H.logic;
@@ -169,73 +167,17 @@ function CanvasInner({
         title: kind === 'condition' ? 'Untitled condition' : 'Untitled A/B test',
       },
     };
-    const k = LOGIC_KIND[kind] || LOGIC_KIND.condition;
-    // inEdge enters the new logic node's 'in' target. Source handle comes
-    // from the original edge; if the original source was a page/source it's
-    // 'out', if logic it's 'yes'/'no'/'a'/'b'.
-    const origFromNode = nodes.find((n) => n.id === orig.source);
-    const inEdgeSourceHandle =
-      origFromNode?.type === 'logic' ? orig.sourceHandle || 'yes' : 'out';
-    const inEdge = {
-      id: `e-${orig.source}-${id}-${Date.now()}`,
-      source: orig.source,
-      target: id,
-      type: 'pathStats',
-      sourceHandle: inEdgeSourceHandle,
-      targetHandle: 'in',
-      data: {
-        volume: orig.data?.volume || 0,
-        branch: origFromNode?.type === 'logic' ? (orig.data?.branch || null) : null,
-        label: orig.data?.label || null,
-      },
-    };
-    // Both branches auto-connect to the original target so the Y and N
-    // (or A and B) lines are visible immediately — the user can then drag
-    // the secondary branch off to a different destination. Splitting the
-    // volume in half is a sensible default for the A/B kind; for a
-    // Condition we leave the primary at the full volume and the secondary
-    // at zero (no traffic taking the No path until the rule fires).
-    const isAB = kind === 'abtest';
-    const primaryVolume = isAB
-      ? Math.round((orig.data?.volume || 0) / 2)
-      : (orig.data?.volume || 0);
-    const secondaryVolume = isAB
-      ? Math.max(0, (orig.data?.volume || 0) - primaryVolume)
-      : 0;
-    const outEdgePrimary = {
-      id: `e-${id}-${orig.target}-${Date.now() + 1}-yes`,
-      source: id,
-      target: orig.target,
-      type: 'pathStats',
-      sourceHandle: k.primaryBranch,
-      targetHandle: 'in',
-      data: { volume: primaryVolume, branch: k.primaryBranch, label: null },
-    };
-    const outEdgeSecondary = {
-      id: `e-${id}-${orig.target}-${Date.now() + 2}-no`,
-      source: id,
-      target: orig.target,
-      type: 'pathStats',
-      sourceHandle: k.secondaryBranch,
-      targetHandle: 'in',
-      data: { volume: secondaryVolume, branch: k.secondaryBranch, label: null },
-    };
 
-    // Apply both updates as siblings — React batches them in event handlers,
-    // so the next render sees both the new node and the new edges. Nesting
-    // setNodes inside a setEdges reducer triggers React StrictMode's
-    // double-invocation, which would add the same logic node twice.
+    // Drop the card at the cursor with NO automatic connections — neither
+    // the input edge nor the Y/N (or A/B) outputs. The user wires every
+    // edge themselves so each branch is intentional and can be moved or
+    // disconnected without fighting an auto-created line. The originating
+    // edge is left intact; if the user wants to splice the new card into
+    // it, they delete the old edge and drag the new one through the card.
     setNodes((ns) => [...ns, newNode]);
-    setEdges((es) => {
-      const idx = es.findIndex((e) => e.id === edgeId);
-      if (idx === -1) return es;
-      const next = [...es];
-      next.splice(idx, 1, inEdge, outEdgePrimary, outEdgeSecondary);
-      return next;
-    });
-    setSelectedNodeId(null);
+    setSelectedNodeId(id);
     setInsertPicker(null);
-  }, [insertPicker, edges, nodes, setEdges, setNodes]);
+  }, [insertPicker, setNodes]);
 
   const changeSource = useCallback((nodeId, newSrcId) => {
     setNodes((ns) =>
