@@ -2116,29 +2116,25 @@ function LogicNode({ node, selected, onSelect, onDragStart, onConnectStart, onRe
 /* getFloatingAnchor — given a node and a "look toward" point, returns the side
    anchor + outward-direction unit vector for that side. */
 function getFloatingAnchor(node, towardX, towardY, mode, isOutgoing) {
+  /* Canvas grammar: ALL cards use strict left-in / right-out anchors.
+     - Outgoing edges always exit the right-middle of the source card
+     - Incoming edges always enter the left-middle of the destination card
+     This makes the directional flow read consistently L→R across the canvas
+     and prevents the pile-ups that happened when multiple edges all picked
+     the same "facing" side. The `towardX/towardY` args are kept in the
+     signature for API compatibility but no longer drive side selection.
+
+     Source nodes don't have inputs (no leads come INTO a source) so this
+     is moot for them — they're always the `a` (outgoing) endpoint. */
   const w = NODE_W[node.type];
   const h = getNodeH(node, mode);
-  const cx = node.x + w / 2;
   const cy = node.y + h / 2;
-  /* Logic nodes: OUTGOING edges always anchor at right-middle (where the
-     connector dot sits) so Y and N branches share a visible origin point.
-     Incoming edges still use normal floating-anchor logic so they don't
-     all pile onto the right side. */
-  if (node.type === 'logic' && isOutgoing) {
+  if (isOutgoing) {
+    /* exit right-middle */
     return { x: node.x + w, y: cy, ox: 1, oy: 0 };
   }
-  const dx = towardX - cx;
-  const dy = towardY - cy;
-  /* pick dominant axis to determine which side faces toward */
-  if (Math.abs(dx) >= Math.abs(dy)) {
-    return dx >= 0
-      ? { x: node.x + w, y: cy,         ox:  1, oy:  0 }
-      : { x: node.x,     y: cy,         ox: -1, oy:  0 };
-  } else {
-    return dy >= 0
-      ? { x: cx,         y: node.y + h, ox:  0, oy:  1 }
-      : { x: cx,         y: node.y,     ox:  0, oy: -1 };
-  }
+  /* enter left-middle */
+  return { x: node.x, y: cy, ox: -1, oy: 0 };
 }
 
 function computeEdgeGeometry(a, b, allNodes, mode, edge) {
