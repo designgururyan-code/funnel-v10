@@ -441,9 +441,34 @@ function CanvasInner({
   const onConnectStart = useCallback((_, { nodeId }) => {
     setConnectFromId(nodeId);
   }, []);
-  const onConnectEnd = useCallback(() => {
-    setConnectFromId(null);
-  }, []);
+  // onConnectEnd fallback — even if the cursor wasn't within the snap
+  // radius of a target handle, if the user released the drag while hovering
+  // over a node, treat that as "connect to this node". DOM walk-up to find
+  // the node, then run the same logic onConnect uses.
+  const onConnectEnd = useCallback(
+    (event, connectionState) => {
+      setConnectFromId(null);
+      if (connectionState?.toNode) return; // xyflow already created the edge
+      const fromNodeId = connectionState?.fromNode?.id;
+      const fromHandleId = connectionState?.fromHandle?.id || 'out';
+      if (!fromNodeId) return;
+      const target = (event?.target instanceof Element ? event.target : null)?.closest?.(
+        '.react-flow__node',
+      );
+      if (!target) return;
+      const toNodeId = target.dataset?.id;
+      if (!toNodeId || toNodeId === fromNodeId) return;
+      const targetNode = nodes.find((n) => n.id === toNodeId);
+      if (!targetNode || targetNode.type === 'source') return;
+      onConnect({
+        source: fromNodeId,
+        target: toNodeId,
+        sourceHandle: fromHandleId,
+        targetHandle: 'in',
+      });
+    },
+    [nodes, onConnect],
+  );
   const isValidConnection = useCallback((c) => {
     // Sources are entry points, can't receive. Self-loops don't make sense
     // in a funnel. Anything else is fair game — including a second connection
@@ -681,7 +706,7 @@ function CanvasInner({
             snapGrid={[10, 10]}
             minZoom={0.4}
             maxZoom={2}
-            connectionRadius={140}
+            connectionRadius={200}
             fitView={false}
             nodesDraggable={mode === 'build' || mode === 'analyse'}
             nodesConnectable={mode === 'build'}
