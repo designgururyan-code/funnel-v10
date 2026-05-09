@@ -90,6 +90,7 @@ const PlayIcon     = I(<polygon points="5 3 19 12 5 21 5 3"/>);
 const GiftIcon     = I(<><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></>);
 const Activity     = I(<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>);
 const Download     = I(<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></>);
+const UploadIcon   = I(<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></>);
 const FacebookIcon = ({size=14}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M22 12c0-5.52-4.48-10-10-10S2 6.48 2 12c0 4.84 3.44 8.87 8 9.8V15H8v-3h2V9.5C10 7.57 11.57 6 13.5 6H16v3h-2c-.55 0-1 .45-1 1v2h3v3h-3v6.95c5.05-.5 9-4.76 9-9.95z"/></svg>;
 const YoutubeIcon  = ({size=14}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1c.5-1.9.5-5.8.5-5.8s0-3.9-.5-5.8zM9.5 15.6V8.4L15.8 12l-6.3 3.6z"/></svg>;
 const InstaIcon    = I(<><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><circle cx="17.5" cy="6.5" r=".5" fill="currentColor"/></>);
@@ -1364,6 +1365,17 @@ function SourceRow({ source, inFunnel: inFunnelProp = null }) {
         <div className="text-[10.5px] text-ink-soft mt-px tabular-nums truncate">{source.meta}</div>
       </div>
       {inFunnel && <span className="mt-px"><Chip kind="in" sm>In funnel</Chip></span>}
+      {!inFunnel && (
+        <Tip label="Add to funnel" side="top">
+          <button onClick={(e) => {
+              e.stopPropagation();
+              window.dispatchEvent(new CustomEvent('sidebar-add-source', { detail: { source } }));
+            }}
+            className="ml-auto w-5 h-5 inline-flex items-center justify-center rounded hover:bg-brand-soft text-ink-soft hover:text-brand transition-colors opacity-0 group-hover/row:opacity-100 mt-px shrink-0">
+            <Plus size={12}/>
+          </button>
+        </Tip>
+      )}
     </div>
   );
 }
@@ -2410,13 +2422,15 @@ function EdgeOverlays({ nodes, edges, zoom, hovered, onHover, onRemove, onInsert
                   {/* number + percent */}
                   <text x={-w/2 + padL + textW/2} y="4" textAnchor="middle" fontSize="11" fontWeight="700" fill="#0F172A"
                         style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif', pointerEvents: 'none' }}>{text}</text>
-                  {/* embedded green stats button at right end */}
-                  <foreignObject x={w/2 - padR - btnW} y={-btnW/2} width={btnW} height={btnW} style={{ overflow: 'visible' }}>
-                    <button onClick={(ev) => { ev.stopPropagation(); setStatsOpen(isOpen ? null : i); }}
-                      title="Path stats"
-                      className="w-[18px] h-[18px] inline-flex items-center justify-center rounded-full bg-good text-white hover:bg-good-deep transition-colors shadow-xs">
-                      <TrendingUp size={10}/>
-                    </button>
+                  {/* embedded green stats button — flex centered in foreignObject */}
+                  <foreignObject x={w/2 - padR - btnW} y={-13} width={btnW} height={26} style={{ overflow: 'visible' }}>
+                    <div style={{ width: btnW, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <button onClick={(ev) => { ev.stopPropagation(); setStatsOpen(isOpen ? null : i); }}
+                        title="Path stats"
+                        className="w-[18px] h-[18px] inline-flex items-center justify-center rounded-full bg-good text-white hover:bg-good-deep transition-colors shadow-xs">
+                        <TrendingUp size={10}/>
+                      </button>
+                    </div>
                   </foreignObject>
                   {/* popover anchored under the button */}
                   {isOpen && (() => {
@@ -3607,7 +3621,7 @@ function InspectorHeader({ node, onClose, api }) {
         </div>
         <div className="text-[13px] font-semibold text-ink truncate leading-tight mt-0.5">{meta.title}</div>
       </div>
-      <div className="relative flex-shrink-0">
+      {node?.type !== 'source' && <div className="relative flex-shrink-0">
         <button onClick={() => setStatusOpen(o => !o)}
           className="inline-flex items-center gap-1.5 h-6 px-2 rounded-md bg-surface-sub border border-line-soft hover:border-line text-[10.5px] font-semibold text-ink transition-colors">
           <span className="relative inline-flex w-1.5 h-1.5">
@@ -3630,7 +3644,7 @@ function InspectorHeader({ node, onClose, api }) {
             ))}
           </div>
         )}
-      </div>
+      </div>}
       <Tip label="Close inspector  Esc" side="bottom">
         <button onClick={onClose}
           className="w-6 h-6 inline-flex items-center justify-center rounded-md text-ink-muted hover:text-ink hover:bg-surface-sub transition-colors flex-shrink-0">
@@ -4252,15 +4266,17 @@ function InspectorSettings({ node, api }) {
               className="w-full h-7 px-2 text-[11.5px] text-ink bg-surface-sub border border-line-soft rounded outline-none focus:border-brand"/>
           </Field>
         )}
-        <Field label="Status">
-          <select value={node.data.status || 'draft'}
-            onChange={(e) => api.updateNodeData(node.id, { status: e.target.value })}
-            className="w-full h-7 pl-2 pr-7 text-[11.5px] text-ink bg-surface-sub border border-line-soft rounded outline-none focus:border-brand">
-            <option value="draft">Draft</option>
-            <option value="live">Live</option>
-            <option value="paused">Paused</option>
-          </select>
-        </Field>
+        {node.type !== 'source' && (
+          <Field label="Status">
+            <select value={node.data.status || 'draft'}
+              onChange={(e) => api.updateNodeData(node.id, { status: e.target.value })}
+              className="w-full h-7 pl-2 pr-7 text-[11.5px] text-ink bg-surface-sub border border-line-soft rounded outline-none focus:border-brand">
+              <option value="draft">Draft</option>
+              <option value="live">Live</option>
+              <option value="paused">Paused</option>
+            </select>
+          </Field>
+        )}
         {node.type === 'page' && (
           <Field label="Replace page">
             <select
@@ -4429,10 +4445,36 @@ function InspectorSettings({ node, api }) {
               ))}
             </div>
           </Field>
-          <Field label="Screenshot URL">
-            <input value={node.data.screenshot || ''} onChange={(e) => api.updateNodeData(node.id, { screenshot: e.target.value })}
-              placeholder="https://… or leave empty for wireframe"
-              className="w-full h-7 px-2 text-[11.5px] text-ink bg-surface-sub border border-line-soft rounded outline-none focus:border-brand"/>
+          <Field label="Page image">
+            {node.data.screenshot ? (
+              <div className="space-y-1.5">
+                <div className="relative rounded-md overflow-hidden border border-line-soft bg-surface-sub">
+                  <img src={node.data.screenshot} alt="" className="w-full h-20 object-cover object-top"/>
+                  <button onClick={() => api.updateNodeData(node.id, { screenshot: '' })}
+                    title="Remove image"
+                    className="absolute top-1 right-1 w-5 h-5 inline-flex items-center justify-center rounded bg-white/90 text-ink-muted hover:text-bad-deep hover:bg-white transition-colors shadow-xs">
+                    <X size={11}/>
+                  </button>
+                </div>
+                <input value={node.data.screenshot} onChange={(e) => api.updateNodeData(node.id, { screenshot: e.target.value })}
+                  className="w-full h-7 px-2 text-[10.5px] text-ink-soft bg-surface-sub border border-line-soft rounded outline-none focus:border-brand font-mono truncate"/>
+              </div>
+            ) : (
+              <label className="block w-full border-2 border-dashed border-line-soft rounded-md hover:border-brand hover:bg-brand-soft/40 transition-colors cursor-pointer text-center py-4">
+                <input type="file" accept="image/*" className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (ev) => api.updateNodeData(node.id, { screenshot: ev.target?.result });
+                    reader.readAsDataURL(file);
+                  }}/>
+                <UploadIcon size={16} className="mx-auto text-ink-soft mb-1"/>
+                <div className="text-[11px] font-medium text-ink-muted">Click to upload</div>
+                <div className="text-[10px] text-ink-soft mt-0.5">PNG, JPG up to 5MB</div>
+              </label>
+            )}
+            <p className="text-[10px] text-ink-soft leading-snug mt-1">Or paste a URL above. Leave empty for wireframe.</p>
           </Field>
         </InspSection>
       )}
@@ -4704,9 +4746,9 @@ function InspectorEmpty({ funnel, canvasNodes = [], mode = "build" }) {
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto scroll-thin">
-        {/* Diagnosis-first Analyse callout — sits above the stats grid in
-           Analyse mode only. Surfaces the biggest leak + best step + a single
-           next-action so the user knows where to look first. */}
+        {/* Funnel flow graph — Analyse only */}
+        {showDiagnosis && <FunnelGraph canvasNodes={canvasNodes}/>}
+        {/* Diagnosis-first Analyse callout */}
         {showDiagnosis && (() => {
           const pages = canvasNodes.filter(n => n.type === 'page' && typeof n.data.rate === 'number');
           if (!pages.length) return null;
@@ -4746,8 +4788,9 @@ function InspectorEmpty({ funnel, canvasNodes = [], mode = "build" }) {
                     <div className="text-ink leading-snug mt-0.5">Tighten the headline + CTA on <span className="font-semibold">{worst?.data?.title || 'the weakest page'}</span> to lift conversion.</div>
                   </div>
                 </div>
-                <button className="mt-3 w-full h-7 px-2.5 inline-flex items-center justify-center gap-1 rounded text-[11.5px] font-semibold text-white bg-violet hover:bg-violet-deep transition-colors">
-                  <Spark size={11}/> Open in Optimise
+                <button onClick={() => window.dispatchEvent(new CustomEvent('open-ai-suggestions'))}
+                  className="mt-3 w-full h-7 px-2.5 inline-flex items-center justify-center gap-1 rounded text-[11.5px] font-semibold text-white bg-violet hover:bg-violet-deep transition-colors">
+                  <Spark size={11}/> Open in AI suggestions
                 </button>
               </div>
             </div>
@@ -4764,7 +4807,7 @@ function InspectorEmpty({ funnel, canvasNodes = [], mode = "build" }) {
                 </span>
                 <span className={`text-[10px] font-semibold tabular-nums ${s.good ? 'text-good-deep' : 'text-bad-deep'}`}>{s.delta}</span>
               </div>
-              <div className="text-[15px] font-semibold text-ink tabular-nums mt-1.5 leading-none">{s.value}</div>
+              <div className="text-[15px] font-semibold tabular-nums mt-1.5 leading-none" style={{ color: s.color }}>{s.value}</div>
               <div className="text-[10.5px] text-ink-soft mt-1 leading-none">{s.label}</div>
             </div>
           ))}
@@ -5352,8 +5395,12 @@ function OptimiseRow({ title, subtitle, pill, pillKind, onDismiss }) {
     violet: 'bg-violet-soft text-violet',
     good:   'bg-good-soft text-good-deep',
   }[pillKind] || 'bg-surface-sub text-ink';
+  const openSuggestion = () => {
+    window.dispatchEvent(new CustomEvent('open-suggestion', { detail: { title, subtitle, pill } }));
+  };
   return (
-    <div className="group/row w-full px-4 py-2 flex items-start gap-2 hover:bg-surface-sub transition-colors cursor-pointer">
+    <div onClick={openSuggestion}
+      className="group/row w-full px-4 py-2 flex items-start gap-2 hover:bg-surface-sub transition-colors cursor-pointer">
       <div className="flex-1 min-w-0">
         <div className="text-[12px] font-medium text-ink truncate">{title}</div>
         <div className="text-[10.5px] text-ink-soft mt-0.5 truncate">{subtitle}</div>
@@ -5481,6 +5528,70 @@ function EdgeStatCard({ label, value, color, Icon }) {
 }
 
 
+
+function FunnelGraph({ canvasNodes }) {
+  const pages = canvasNodes
+    .filter(n => n.type === 'page' && typeof n.data.visitors === 'number')
+    .sort((a, b) => a.x - b.x);
+  if (pages.length < 2) return null;
+  const maxVisitors = Math.max(...pages.map(p => p.data.visitors));
+  const W = 280, H = 130, pad = 6;
+  const barW = (W - pad * 2) / pages.length;
+  const barAreaH = H - 36;
+  return (
+    <div className="px-4 pt-3">
+      <div className="rounded-lg border border-line-soft bg-white p-3">
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-[10.5px] font-semibold uppercase tracking-wider text-ink-soft">Funnel flow</div>
+          <div className="text-[10px] text-ink-soft">Last 7 days</div>
+        </div>
+        <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} style={{ overflow: 'visible' }}>
+          {pages.map((p, i) => {
+            const visitors = p.data.visitors || 0;
+            const conversions = p.data.conversions || 0;
+            const dropOff = visitors - conversions;
+            const fullH = (visitors / maxVisitors) * barAreaH;
+            const convH = (conversions / maxVisitors) * barAreaH;
+            const dropH = fullH - convH;
+            const x = pad + i * barW;
+            const y = barAreaH - fullH;
+            const color = (PAGE_TYPE[p.data.pageType] || PAGE_TYPE.custom).color;
+            const next = pages[i + 1];
+            const nextX = next ? pad + (i + 1) * barW : null;
+            const nextH = next ? (next.data.visitors / maxVisitors) * barAreaH : null;
+            const nextY = next ? barAreaH - nextH : null;
+            const dropPct = visitors ? Math.round((dropOff / visitors) * 100) : 0;
+            const titleStr = (p.data.title || '');
+            const truncTitle = titleStr.length > 12 ? titleStr.slice(0, 11) + '…' : titleStr;
+            return (
+              <g key={p.id}>
+                {next && (
+                  <polygon
+                    points={`${x + barW * 0.85},${y + dropH} ${x + barW * 0.85},${barAreaH} ${nextX + barW * 0.15},${barAreaH} ${nextX + barW * 0.15},${nextY}`}
+                    fill={color} opacity="0.10"/>
+                )}
+                {dropH > 1 && (
+                  <rect x={x + barW * 0.15} y={y} width={barW * 0.7} height={dropH}
+                    fill={color} opacity="0.25" rx="2"/>
+                )}
+                <rect x={x + barW * 0.15} y={y + dropH} width={barW * 0.7} height={convH}
+                  fill={color} rx="2"/>
+                <text x={x + barW * 0.5} y={barAreaH + 14} textAnchor="middle" fontSize="8.5" fill="#475569" fontWeight="500">
+                  {truncTitle}
+                </text>
+                <text x={x + barW * 0.5} y={barAreaH + 24} textAnchor="middle" fontSize="9" fill="#0F172A" fontWeight="700">
+                  {visitors >= 1000 ? (visitors / 1000).toFixed(1) + 'k' : visitors}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+
 export default function App() {
   const [aiOpen, setAiOpen] = useState(false);
   const [aiChatOpen, setAiChatOpen] = useState(false); // Build with AI sidebar mode
@@ -5517,6 +5628,21 @@ export default function App() {
     };
     window.addEventListener('sidebar-focus', handler);
     return () => window.removeEventListener('sidebar-focus', handler);
+  }, []);
+  useEffect(() => {
+    const handler = () => setAiOpen(true);
+    window.addEventListener('open-ai-suggestions', handler);
+    return () => window.removeEventListener('open-ai-suggestions', handler);
+  }, []);
+  useEffect(() => {
+    const handler = (e) => {
+      const source = e?.detail?.source;
+      if (source && canvasApi.current) {
+        canvasApi.current.addNode({ type: 'source', data: { src: source.id, visitorsNum: 0 } });
+      }
+    };
+    window.addEventListener('sidebar-add-source', handler);
+    return () => window.removeEventListener('sidebar-add-source', handler);
   }, []);
   const [project, setProject] = useState(PROJECTS[0]);
   const [funnel, setFunnel] = useState(FUNNELS[0]);
