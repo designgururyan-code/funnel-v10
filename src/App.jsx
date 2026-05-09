@@ -2291,7 +2291,7 @@ function getEdgeStroke(edge, isHovered) {
 /* ─── EDGE PATHS — bezier paths only. Renders BEHIND nodes so cards always
    sit on top of lines. Hit-target path captures hover. Arrows live in
    EdgeOverlays (rendered above nodes) so the tip is never occluded. ─── */
-function EdgePaths({ nodes, edges, hovered, onHover, mode }) {
+function EdgePaths({ nodes, edges, hovered, onHover, onSelect, mode }) {
   return (
     <svg className="absolute inset-0 pointer-events-none overflow-visible"
          style={{ width: '100%', height: '100%', left: 0, top: 0 }}>
@@ -2304,10 +2304,12 @@ function EdgePaths({ nodes, edges, hovered, onHover, mode }) {
         const stroke = getEdgeStroke(e, isHovered);
         return (
           <g key={i}>
-            {/* hit target — wider so the × stays inside the hover region (~28px) */}
+            {/* hit target — wider so the × stays inside the hover region (~28px).
+               Click selects the edge so the Inspector can show it. */}
             <path d={geo.path} stroke="transparent" strokeWidth={28} fill="none"
                   style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
-                  onMouseEnter={() => onHover(i)} onMouseLeave={() => onHover(null)}/>
+                  onMouseEnter={() => onHover(i)} onMouseLeave={() => onHover(null)}
+                  onClick={(ev) => { ev.stopPropagation(); onSelect && onSelect(i); }}/>
             {/* visible path — uniform 2px (no volume-weighting; visual consistency) */}
             <path d={geo.path} stroke={stroke} strokeWidth={2} fill="none" strokeLinecap="round"
                   style={{ transition: 'stroke 140ms ease' }}/>
@@ -2445,27 +2447,64 @@ function EdgeOverlays({ nodes, edges, zoom, hovered, onHover, onRemove, onInsert
                               <X size={11}/>
                             </button>
                           </div>
-                          {/* Stats body — smaller numbers (13px) */}
-                          <div className="p-3 grid grid-cols-2 gap-x-3 gap-y-2">
-                            <div>
-                              <div className="text-[10px] uppercase tracking-wider text-ink-soft">Visitors</div>
-                              <div className="text-[13px] font-semibold text-ink tabular-nums leading-tight mt-0.5">{vol.toLocaleString()}</div>
+                          {/* Stats body — coloured icons + tinted values for a
+                             scannable, varied look (was monochrome). Smaller numbers. */}
+                          <div className="p-3 grid grid-cols-2 gap-2">
+                            <div className="flex items-start gap-1.5 min-w-0">
+                              <span className="w-4 h-4 rounded inline-flex items-center justify-center mt-0.5 shrink-0" style={{ background: '#E6F0F9', color: '#006CB5' }}>
+                                <Eye size={9}/>
+                              </span>
+                              <div className="min-w-0">
+                                <div className="text-[9.5px] uppercase tracking-wider text-ink-soft">Visitors</div>
+                                <div className="text-[12.5px] font-semibold tabular-nums leading-tight" style={{ color: '#006CB5' }}>{vol.toLocaleString()}</div>
+                              </div>
                             </div>
-                            <div>
-                              <div className="text-[10px] uppercase tracking-wider text-ink-soft">Conversion</div>
-                              <div className="text-[13px] font-semibold text-good-deep tabular-nums leading-tight mt-0.5">{conv}%</div>
+                            <div className="flex items-start gap-1.5 min-w-0">
+                              <span className="w-4 h-4 rounded inline-flex items-center justify-center mt-0.5 shrink-0" style={{ background: '#ECFDF5', color: '#10B981' }}>
+                                <TrendingUp size={9}/>
+                              </span>
+                              <div className="min-w-0">
+                                <div className="text-[9.5px] uppercase tracking-wider text-ink-soft">Conversion</div>
+                                <div className="text-[12.5px] font-semibold text-good-deep tabular-nums leading-tight">{conv}%</div>
+                              </div>
                             </div>
-                            <div>
-                              <div className="text-[10px] uppercase tracking-wider text-ink-soft">Drop-off</div>
-                              <div className="text-[13px] font-semibold text-bad-deep tabular-nums leading-tight mt-0.5">{drop}%</div>
+                            <div className="flex items-start gap-1.5 min-w-0">
+                              <span className="w-4 h-4 rounded inline-flex items-center justify-center mt-0.5 shrink-0" style={{ background: '#FEE2E2', color: '#DC2626' }}>
+                                <Activity size={9}/>
+                              </span>
+                              <div className="min-w-0">
+                                <div className="text-[9.5px] uppercase tracking-wider text-ink-soft">Drop-off</div>
+                                <div className="text-[12.5px] font-semibold text-bad-deep tabular-nums leading-tight">{drop}%</div>
+                              </div>
                             </div>
-                            <div>
-                              <div className="text-[10px] uppercase tracking-wider text-ink-soft">Time-to-next</div>
-                              <div className="text-[13px] font-semibold text-ink tabular-nums leading-tight mt-0.5">0:42</div>
+                            <div className="flex items-start gap-1.5 min-w-0">
+                              <span className="w-4 h-4 rounded inline-flex items-center justify-center mt-0.5 shrink-0" style={{ background: '#F3EEFF', color: '#7C3AED' }}>
+                                <Eye size={9}/>
+                              </span>
+                              <div className="min-w-0">
+                                <div className="text-[9.5px] uppercase tracking-wider text-ink-soft">Time-to-next</div>
+                                <div className="text-[12.5px] font-semibold tabular-nums leading-tight" style={{ color: '#7C3AED' }}>0:42</div>
+                              </div>
                             </div>
                           </div>
-                          <div className="px-3 py-2 bg-surface-sub border-t border-line-soft text-[10.5px] text-ink-soft leading-snug">
-                            From last 7 days. Drop-off = visitors who entered this edge but didn't reach the next step.
+                          {/* Quick actions — covers most of edge-selection value
+                             without the user needing to leave the canvas. */}
+                          <div className="px-3 py-2 bg-surface-sub border-t border-line-soft flex items-center gap-1">
+                            <button title="Add condition"
+                              className="flex-1 h-7 inline-flex items-center justify-center gap-1 text-[10.5px] font-semibold text-ink-muted bg-white border border-line rounded hover:border-violet hover:text-violet transition-colors">
+                              <Workflow size={10}/> Condition
+                            </button>
+                            <button title="Add A/B split"
+                              className="flex-1 h-7 inline-flex items-center justify-center gap-1 text-[10.5px] font-semibold text-ink-muted bg-white border border-line rounded hover:border-warn hover:text-warn-deep transition-colors">
+                              <Bars size={10}/> A/B
+                            </button>
+                            <button title="Disconnect"
+                              className="h-7 px-2 inline-flex items-center justify-center text-[10.5px] font-semibold text-ink-muted bg-white border border-line rounded hover:border-bad hover:text-bad-deep transition-colors">
+                              <X size={10}/>
+                            </button>
+                          </div>
+                          <div className="px-3 py-1.5 bg-surface-sub border-t border-line-soft text-[10px] text-ink-soft leading-snug">
+                            From last 7 days. Drop-off = visitors who didn't reach the next step.
                           </div>
                         </div>
                       </foreignObject>
@@ -2575,13 +2614,13 @@ function ZoomControls({ zoom, onZoomIn, onZoomOut, onFit, onSetZoom, onAutoLayou
         </button>
       </Tip>
       <span className="w-px bg-line-soft"/>
-      <Tip label="Auto layout" side="top">
+      <Tip label="Tidy layout" side="top">
         <button onClick={onAutoLayout} className="w-8 h-8 inline-flex items-center justify-center text-ink-muted hover:bg-surface-sub hover:text-ink transition-colors">
           <Sparkles size={13}/>
         </button>
       </Tip>
       <span className="w-px bg-line-soft"/>
-      <Tip label="Fit to canvas  Z" side="top">
+      <Tip label="Fit view  Z" side="top">
         <button onClick={onFit} className="w-8 h-8 inline-flex items-center justify-center text-ink-muted hover:bg-surface-sub hover:text-ink transition-colors">
           <Maximize size={13}/>
         </button>
@@ -2640,6 +2679,7 @@ function Canvas({ mode, demoState, onDemoStateChange, onJumpToTemplates, onJumpT
   const canvasViewportEl = useRef(null);
   const [zoom, setZoom] = useState(1);
   const [selected, setSelected] = useState(null);
+  const [selectedEdgeIdx, setSelectedEdgeIdx] = useState(null);
   const [hoveredEdge, setHoveredEdge] = useState(null);
   const [drag, setDrag] = useState(null); /* canvas pan drag */
   const [nodeDrag, setNodeDrag] = useState(null); /* { nodeId, startX, startY, startNodeX, startNodeY } */
@@ -2714,15 +2754,29 @@ function Canvas({ mode, demoState, onDemoStateChange, onJumpToTemplates, onJumpT
     /* push the node. isEmpty checks nodes.length so empty canvas resolves correctly. */
     setNodes(ns => [...ns, newNode]);
     setSelected(id);
+    setSelectedEdgeIdx(null);
   };
 
-  /* Push selection up to App whenever it changes — Inspector reads from there.
-     Sends the full node object so Inspector doesn't need access to nodes[]. */
+  /* Push selection up to App whenever it changes. Now supports edge selection
+     too — the Inspector receives either a node OR an edge envelope. */
   useEffect(() => {
     if (!onSelectionChange) return;
+    if (selectedEdgeIdx != null) {
+      const e = edges[selectedEdgeIdx];
+      if (e) {
+        onSelectionChange({
+          __kind: 'edge',
+          edge: e,
+          edgeIdx: selectedEdgeIdx,
+          fromNode: nodes.find(n => n.id === e.from),
+          toNode:   nodes.find(n => n.id === e.to),
+        });
+        return;
+      }
+    }
     const node = selected ? nodes.find(n => n.id === selected) : null;
     onSelectionChange(node || null);
-  }, [selected, nodes, onSelectionChange]);
+  }, [selected, selectedEdgeIdx, nodes, edges, onSelectionChange]);
 
   /* Imperative API exposed to App — App calls these when the user interacts with
      the Inspector (rename, change rule, duplicate, remove, etc.) so Canvas's
@@ -2744,7 +2798,9 @@ function Canvas({ mode, demoState, onDemoStateChange, onJumpToTemplates, onJumpT
         setNodes(ns => [...ns, copy]);
         setSelected(newId);
       },
-      deselect:       () => setSelected(null),
+      deselect:       () => { setSelected(null); setSelectedEdgeIdx(null); },
+      removeEdge:     (idx) => setEdges(es => es.filter((_, i) => i !== idx)),
+      addEdgeBranch:  (idx, branch) => setEdges(es => es.map((e, i) => i === idx ? { ...e, branch } : e)),
       addNode:        ({ type, data, x, y }) => {
         const newId = (type || 'page') + '-' + Date.now();
         // Center of current visible canvas (compensate pan/zoom)
@@ -3386,7 +3442,7 @@ function Canvas({ mode, demoState, onDemoStateChange, onJumpToTemplates, onJumpT
           }}>
           {/* edges paths layer — sits behind nodes so cards always overlap connections */}
           <div className="absolute" style={{ left: 0, top: 0, width: 4000, height: 2000, pointerEvents: 'none' }}>
-            <EdgePaths nodes={nodes} edges={edges} hovered={hoveredEdge} onHover={setHoveredEdge} mode={mode}/>
+            <EdgePaths nodes={nodes} edges={edges} hovered={hoveredEdge} onHover={setHoveredEdge} mode={mode} onSelect={(i) => { setSelected(null); setSelectedEdgeIdx(i); }}/>
           </div>
 
           {/* node layer */}
@@ -5264,7 +5320,7 @@ function OptimiseEmptyState({ funnel }) {
             <span className="w-7 h-7 rounded-md bg-violet-soft text-violet flex items-center justify-center ai-ripple">
               <Spark size={13} className="ai-breathe-icon"/>
             </span>
-            <span className="text-[11.5px] text-ink-soft flex-1 leading-snug">Run an AI audit to discover more opportunities.</span>
+            <span className="text-[11.5px] text-ink-soft flex-1 leading-snug">Find more opportunities. AI scans every step + suggests tests.</span>
             <button onClick={runAudit}
               className="h-7 px-2.5 inline-flex items-center text-[11.5px] font-semibold text-violet hover:bg-violet-soft rounded transition-colors">
               Run audit
@@ -5310,6 +5366,116 @@ function OptimiseRow({ title, subtitle, pill, pillKind, onDismiss }) {
           <X size={10}/>
         </button>
       )}
+    </div>
+  );
+}
+
+
+
+/* InspectorEdge — right-panel view when the user clicks a connection line.
+   Shows From → To, mid-edge stats, and quick actions (Add condition,
+   Add A/B split, Disconnect). Identical aside width as node Inspector. */
+function InspectorEdge({ envelope, api }) {
+  const { edge, edgeIdx, fromNode, toNode } = envelope || {};
+  const fromTitle = fromNode?.data?.title || (fromNode?.type === 'source' ? (SOURCES.find(s => s.id === fromNode?.data?.src)?.name || 'Source') : 'From');
+  const toTitle   = toNode?.data?.title   || 'To';
+  const fromColor = fromNode?.type === 'source'
+    ? (SOURCES.find(s => s.id === fromNode?.data?.src)?.color || '#006CB5')
+    : (PAGE_TYPE[fromNode?.data?.pageType]?.color || '#006CB5');
+  const vol = edge?.volume || 0;
+  const fromVisitors = fromNode?.data?.visitorsNum || fromNode?.data?.visitors || 100;
+  const conv = vol ? Math.round((vol / Math.max(1, fromVisitors)) * 100) : 0;
+  const drop = Math.max(0, 100 - conv);
+  const branch = edge?.branch;
+
+  return (
+    <aside className="w-[320px] border-l border-line bg-white flex flex-col shrink-0">
+      {/* Header — From → To, coloured by source */}
+      <div className="px-4 py-3 border-b border-line-soft flex items-center gap-2.5 overflow-visible">
+        <span className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0"
+              style={{ background: fromColor + '1a', color: fromColor }}>
+          <TrendingUp size={14}/>
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="text-[10px] font-semibold uppercase tracking-wider"
+               style={{ color: fromColor, letterSpacing: '0.06em' }}>
+            Connection · selected
+          </div>
+          <div className="text-[12.5px] font-semibold text-ink truncate leading-tight mt-0.5">
+            {fromTitle} <span className="text-ink-soft">→</span> {toTitle}
+          </div>
+        </div>
+        <Tip label="Close inspector  Esc" side="bottom">
+          <button onClick={() => api.deselect && api.deselect()}
+            className="w-6 h-6 inline-flex items-center justify-center rounded-md text-ink-muted hover:text-ink hover:bg-surface-sub transition-colors flex-shrink-0">
+            <X size={12}/>
+          </button>
+        </Tip>
+      </div>
+
+      <div className="flex-1 overflow-y-auto scroll-thin px-4 py-3 space-y-4">
+        {/* Performance */}
+        <InspSection label="Performance">
+          <div className="grid grid-cols-2 gap-2">
+            <EdgeStatCard label="Visitors" value={vol.toLocaleString()} color="#006CB5" Icon={Eye}/>
+            <EdgeStatCard label="Conversion" value={conv + '%'} color="#10B981" Icon={TrendingUp}/>
+            <EdgeStatCard label="Drop-off" value={drop + '%'} color="#DC2626" Icon={Activity}/>
+            <EdgeStatCard label="Time-to-next" value="0:42" color="#7C3AED" Icon={Eye}/>
+          </div>
+        </InspSection>
+
+        {/* Routing rule (read-only display of branch identity) */}
+        {branch && (
+          <InspSection label="Routing rule">
+            <div className="flex items-center gap-2 px-2.5 py-2 bg-surface-sub border border-line-soft rounded-md">
+              <span className="w-5 h-5 rounded-full inline-flex items-center justify-center text-white text-[10px] font-bold"
+                style={{ background:
+                  branch === 'yes' ? '#10B981' :
+                  branch === 'no'  ? '#94A3B8' :
+                  branch === 'a'   ? '#7C3AED' :
+                  branch === 'b'   ? '#F59E0B' : '#94A3B8'
+                }}>
+                {branch.toUpperCase().charAt(0)}
+              </span>
+              <span className="text-[11.5px] text-ink font-medium capitalize">{branch}</span>
+              <span className="text-[10.5px] text-ink-soft ml-auto">branch</span>
+            </div>
+          </InspSection>
+        )}
+        {!branch && (
+          <InspSection label="Routing rule">
+            <div className="px-2.5 py-2 bg-surface-sub border border-line-soft rounded-md">
+              <div className="text-[11.5px] text-ink">Everyone</div>
+              <div className="text-[10.5px] text-ink-soft mt-0.5 leading-snug">All visitors take this path. Add a condition or A/B split below to branch the flow.</div>
+            </div>
+          </InspSection>
+        )}
+
+        {/* Actions */}
+        <InspSection label="Actions">
+          <ActionButton icon={<Workflow size={11}/>} label="Add condition"
+            onClick={() => api.addEdgeBranch && api.addEdgeBranch(edgeIdx, 'yes')}/>
+          <ActionButton icon={<Bars size={11}/>}     label="Add A/B split"
+            onClick={() => api.addEdgeBranch && api.addEdgeBranch(edgeIdx, 'a')}/>
+          <ActionButton icon={<X size={11}/>}        label="Disconnect" destructive
+            onClick={() => { api.removeEdge && api.removeEdge(edgeIdx); api.deselect && api.deselect(); }}/>
+        </InspSection>
+      </div>
+    </aside>
+  );
+}
+
+function EdgeStatCard({ label, value, color, Icon }) {
+  return (
+    <div className="bg-white border border-line-soft rounded-md px-2.5 py-2 hover:border-line-strong transition-colors">
+      <div className="flex items-center justify-between mb-1">
+        <span className="w-5 h-5 rounded inline-flex items-center justify-center"
+              style={{ background: color + '1a', color }}>
+          <Icon size={11}/>
+        </span>
+      </div>
+      <div className="text-[10px] uppercase tracking-wider text-ink-soft">{label}</div>
+      <div className="text-[14px] font-semibold tabular-nums leading-none mt-0.5" style={{ color }}>{value}</div>
     </div>
   );
 }
@@ -5391,7 +5557,9 @@ export default function App() {
           onSelectionChange={setSelectedNode}
           canvasApiRef={canvasApi}/>
         {selectedNode
-          ? <Inspector node={selectedNode} api={canvasApi.current || {}} mode={mode}/>
+          ? (selectedNode.__kind === 'edge'
+              ? <InspectorEdge envelope={selectedNode} api={canvasApi.current || {}}/>
+              : <Inspector node={selectedNode} api={canvasApi.current || {}} mode={mode}/>)
           : <InspectorEmpty funnel={funnel} canvasNodes={canvasNodes} mode={mode}/>}
       </div>
       <AIPopover open={aiOpen} onClose={() => setAiOpen(false)}/>
