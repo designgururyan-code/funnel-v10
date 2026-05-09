@@ -30,6 +30,8 @@ import {
   TrendUp,
   Workflow,
   Bars,
+  Sparkles,
+  X,
 } from '../App.jsx';
 
 import { nodesToFlow, edgesToFlow, flowToNode, flowToEdge } from './util/transform.js';
@@ -636,9 +638,40 @@ function CanvasInner({
     });
     const laidOut = dagreLayout(nodes, edges, { sizeFor, hGap: 200, vGap: 90 });
     setNodes(laidOut);
+    setCrampedDismissed(true); // hide the hint once we've cleaned up
     // fit-to-view after the layout settles so the user sees the result framed
     setTimeout(() => rf.fitView({ padding: 0.18, duration: 320 }), 50);
   };
+
+  // ───────────────────────── Cramped-layout hint ─────────────────────────
+  // If two cards' bounding boxes sit closer than CRAMPED_DIST px (or overlap),
+  // surface a small toast suggesting Tidy layout. Once dismissed it stays
+  // hidden until the user does another demo-state load.
+  const [crampedDismissed, setCrampedDismissed] = useState(false);
+  const isCramped = useMemo(() => {
+    if (mode !== 'build' || nodes.length < 2) return false;
+    const CRAMPED_DIST = 24;
+    const heightFor = (n) => getNodeH({ type: n.type, data: n.data }, mode);
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i], b = nodes[j];
+        const aw = NODE_W[a.type] || 240, ah = heightFor(a);
+        const bw = NODE_W[b.type] || 240, bh = heightFor(b);
+        const ax = a.position.x, ay = a.position.y;
+        const bx = b.position.x, by = b.position.y;
+        const dx = Math.max(0, Math.max(ax - (bx + bw), bx - (ax + aw)));
+        const dy = Math.max(0, Math.max(ay - (by + bh), by - (ay + ah)));
+        if (Math.hypot(dx, dy) < CRAMPED_DIST) return true;
+      }
+    }
+    return false;
+  }, [nodes, mode]);
+  // Reset the dismissed flag whenever the demo state switches so the hint can
+  // re-surface on a freshly-loaded layout.
+  useEffect(() => {
+    setCrampedDismissed(false);
+  }, [demoState]);
+  const showCrampedHint = isCramped && !crampedDismissed;
   const [zoomDisplay, setZoomDisplay] = useState(1);
   useEffect(() => {
     // Sync zoomDisplay with viewport.
@@ -731,6 +764,55 @@ function CanvasInner({
           onAutoLayout={onAutoLayout}
           onSetZoom={onSetZoom}
         />
+      )}
+
+      {/* Cramped-layout hint — appears when two cards sit closer than 24px
+         or overlap. Click "Tidy now" to run dagre, click X to dismiss until
+         the next demo-state load. */}
+      {showCrampedHint && (
+        <div
+          className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30
+                     bg-white border border-line rounded-lg shadow-menu
+                     px-3 py-2.5 flex items-center gap-3 max-w-[460px]"
+          style={{ animation: 'menuIn 160ms ease-out' }}
+        >
+          <span
+            className="w-7 h-7 rounded-md inline-flex items-center justify-center flex-shrink-0"
+            style={{ background: '#F3EEFF', color: '#7C3AED' }}
+          >
+            <Sparkles size={14} />
+          </span>
+          <div className="flex-1 min-w-0">
+            <div className="text-[12.5px] font-semibold text-ink leading-tight">
+              Things look a bit cramped
+            </div>
+            <div className="text-[11px] text-ink-soft leading-snug mt-0.5">
+              Tap{' '}
+              <span className="inline-flex items-center gap-1 px-1 py-0.5 mx-0.5 align-middle bg-surface-sub border border-line-soft rounded text-ink-muted">
+                <Sparkles size={10} />
+                Tidy
+              </span>{' '}
+              in the bottom-right toolbar — or hit the button below.
+            </div>
+          </div>
+          <button
+            onClick={onAutoLayout}
+            className="px-2.5 h-7 inline-flex items-center gap-1 rounded-md
+                       bg-violet text-white text-[11.5px] font-semibold
+                       hover:bg-violet-deep transition-colors flex-shrink-0"
+          >
+            <Sparkles size={11} /> Tidy now
+          </button>
+          <button
+            onClick={() => setCrampedDismissed(true)}
+            className="w-6 h-6 inline-flex items-center justify-center rounded-md
+                       text-ink-muted hover:text-ink hover:bg-surface-sub
+                       transition-colors flex-shrink-0"
+            aria-label="Dismiss"
+          >
+            <X size={11} />
+          </button>
+        </div>
       )}
 
       {/* insert-step picker — opens at edge midpoint when user clicks the +

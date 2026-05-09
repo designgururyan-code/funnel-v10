@@ -4184,7 +4184,7 @@ export {
   useCountUp, formatVolume, heatTextColor,
   Tip, Popover, MenuItem, MenuDivider, Wireframe,
   EmptyCanvas, ViewSwitcher, ZoomControls, ExportFunnelButton,
-  X, Edit, ChevronRight, Spark, Bars, Workflow,
+  X, Edit, ChevronRight, Spark, Sparkles, Bars, Workflow,
   UsersIcon, TrendingUp, Activity, Eye, FileIcon, Cart, TrendUp,
 };
 
