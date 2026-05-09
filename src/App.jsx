@@ -2019,6 +2019,7 @@ function LogicNode({ node, selected, onSelect, onDragStart, onConnectStart, onRe
         left: node.x,
         top: node.y,
         width: NODE_W.logic,
+        height: NODE_H.logic,
         transform: selected ? 'scale(1.02)' : '',
         transformOrigin: 'center center',
         transition: 'transform 150ms cubic-bezier(0.32, 0.72, 0, 1)',
@@ -2086,37 +2087,34 @@ function LogicNode({ node, selected, onSelect, onDragStart, onConnectStart, onRe
         </div>
       </div>
 
-      {/* Single output dot — INLINE pixel-explicit positioning. Tailwind
-         arbitrary values (right-0, top-1/2) had reliability issues so we use
-         inline styles directly. The dot sits half-outside the right edge,
-         vertically centered on the card. Always visible (not hover-gated)
-         because branching is the whole point of this card type. */}
-      {!readonly && (() => {
-        const ringRGB = hexToRGB(VIOLET);
-        return (
-          <span
-            data-connector-dot
-            title="Drag to connect a branch"
-            onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); onConnectStart(node.id, 'right', e); }}
-            style={{
-              position: 'absolute',
-              top: '50%',
-              right: '-8px',
-              transform: 'translateY(-50%)',
-              width: '16px',
-              height: '16px',
-              borderRadius: '9999px',
-              background: VIOLET,
-              boxShadow: `0 0 0 3px rgba(255,255,255,1), 0 0 0 5px rgba(${ringRGB},0.32), 0 2px 6px rgba(0,0,0,0.20)`,
-              cursor: 'crosshair',
-              zIndex: 30,
-              transition: 'transform 150ms cubic-bezier(0.32, 0.72, 0, 1)',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-50%) scale(1.35)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(-50%) scale(1)'; }}
-          />
-        );
-      })()}
+      {/* Single output dot — pixel-positioned (not %) because the wrapper has
+         auto height and Tailwind's top-1/2 was rendering at unexpected positions.
+         NODE_H.logic = 80, so top: 40 = vertical center. Always visible.
+         Drag once = first branch (Y/A); drag again = second (N/B). */}
+      {!readonly && (
+        <span
+          data-connector-dot
+          title="Drag to connect a branch"
+          onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); onConnectStart(node.id, 'right', e); }}
+          style={{
+            position: 'absolute',
+            top: '40px',
+            right: '-9px',
+            width: '18px',
+            height: '18px',
+            borderRadius: '9999px',
+            background: VIOLET,
+            border: '3px solid #ffffff',
+            boxShadow: `0 0 0 2px ${VIOLET}55, 0 2px 6px rgba(0,0,0,0.25)`,
+            cursor: 'crosshair',
+            zIndex: 50,
+            transform: 'translateY(-50%)',
+            transition: 'transform 150ms cubic-bezier(0.32, 0.72, 0, 1)',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-50%) scale(1.35)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(-50%) scale(1)'; }}
+        />
+      )}
     </div>
   );
 }
@@ -2847,6 +2845,7 @@ function Canvas({ mode, demoState, onDemoStateChange, onJumpToTemplates, onJumpT
       deselect:       () => { setSelected(null); setSelectedEdgeIdx(null); },
       removeEdge:     (idx) => setEdges(es => es.filter((_, i) => i !== idx)),
       addEdgeBranch:  (idx, branch) => setEdges(es => es.map((e, i) => i === idx ? { ...e, branch } : e)),
+      updateEdge:     (idx, patch) => setEdges(es => es.map((e, i) => i === idx ? { ...e, ...patch } : e)),
       addNode:        ({ type, data, x, y }) => {
         const newId = (type || 'page') + '-' + Date.now();
         // Center of current visible canvas (compensate pan/zoom)
@@ -2871,7 +2870,7 @@ function Canvas({ mode, demoState, onDemoStateChange, onJumpToTemplates, onJumpT
         });
       },
       getNodes: () => nodes,
-      getOutgoingEdges: (nodeId) => edges.filter(e => e.from === nodeId),
+      getOutgoingEdges: (nodeId) => edges.map((e, i) => ({ ...e, edgeIdx: i })).filter(e => e.from === nodeId),
       panToNodeByTitle: (title) => {
         const match = nodes.find(n => n.data && n.data.title === title);
         if (!match) return;
@@ -3493,22 +3492,29 @@ function Canvas({ mode, demoState, onDemoStateChange, onJumpToTemplates, onJumpT
           </div>
 
           {/* node layer */}
-          {nodes.map(n =>
-              n.type === 'page'  ? <PageNode   key={n.id} node={n} mode={mode} selected={selected === n.id} onSelect={setSelected}
-                                               onDragStart={onNodeDragStart}
-                                               onConnectStart={onConnectStart}
-                                               onRemove={removeNode}/>
-            : n.type === 'logic' ? <LogicNode  key={n.id} node={n}              selected={selected === n.id} onSelect={setSelected}
-                                               onDragStart={onNodeDragStart}
-                                               onConnectStart={onConnectStart}
-                                               onRemove={removeNode}
-                                               outgoingCount={edges.filter(e => e.from === n.id).length}/>
-            :                      <SourceNode key={n.id} node={n} mode={mode} selected={selected === n.id} onSelect={setSelected}
-                                               onDragStart={onNodeDragStart}
-                                               onConnectStart={onConnectStart}
-                                               onChangeSource={changeSource}
-                                               onRemove={removeNode}
-                                               target={sourceTargets[n.id]}/>
+          {nodes.map(n => {
+              // Wrap setSelected so clicking a node also clears any active edge
+              // selection. Without this, edge selection wins via the early-return
+              // in the sync useEffect and the node Inspector never opens.
+              const selectNode = (id) => { setSelected(id); setSelectedEdgeIdx(null); };
+              return (
+                n.type === 'page'  ? <PageNode   key={n.id} node={n} mode={mode} selected={selected === n.id} onSelect={selectNode}
+                                                 onDragStart={onNodeDragStart}
+                                                 onConnectStart={onConnectStart}
+                                                 onRemove={removeNode}/>
+              : n.type === 'logic' ? <LogicNode  key={n.id} node={n}              selected={selected === n.id} onSelect={selectNode}
+                                                 onDragStart={onNodeDragStart}
+                                                 onConnectStart={onConnectStart}
+                                                 onRemove={removeNode}
+                                                 outgoingCount={edges.filter(e => e.from === n.id).length} mode={mode}/>
+              :                      <SourceNode key={n.id} node={n} mode={mode} selected={selected === n.id} onSelect={selectNode}
+                                                 onDragStart={onNodeDragStart}
+                                                 onConnectStart={onConnectStart}
+                                                 onChangeSource={changeSource}
+                                                 onRemove={removeNode}
+                                                 target={sourceTargets[n.id]}/>
+              );
+            })}
           )}
 
           {/* edges UI overlay — arrow + chip + stats. Renders ABOVE nodes so neither
