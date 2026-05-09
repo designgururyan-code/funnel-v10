@@ -175,6 +175,13 @@ function CanvasInner({
     });
   }, [nodes, mode, sourceTargets, outgoingCounts, removeNodeById, changeSource]);
 
+  // Thread mode into edge.data so PathStatsEdge can switch its rendering
+  // (mid-edge stat pill is Analyse-only).
+  const decoratedEdges = useMemo(
+    () => edges.map((e) => ({ ...e, data: { ...(e.data || {}), _mode: mode } })),
+    [edges, mode],
+  );
+
   // ───────────────────────── Selection ─────────────────────────
   // xyflow lets us track selection through onSelectionChange. We push back to
   // App via the same envelope shape it had before:
@@ -544,7 +551,7 @@ function CanvasInner({
       {!isEmpty && (
         <ReactFlow
           nodes={decoratedNodes}
-          edges={edges}
+          edges={decoratedEdges}
           onNodesChange={onNodesChangeXY}
           onEdgesChange={onEdgesChangeXY}
           onConnect={onConnect}
