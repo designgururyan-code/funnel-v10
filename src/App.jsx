@@ -573,7 +573,7 @@ const SOURCES = [
   { id:'cpa', name:'CPA',          Icon:Dollar,       color:'#10B981', usage:'available', meta:'Available'     },
   { id:'em',  name:'Email',        Icon:Mail,         color:'#475569', usage:'in-funnel', meta:'846 visitors'  },
   { id:'aff', name:'Affiliates',   Icon:UsersIcon,    color:'#7C3AED', usage:'available', meta:'Available'     },
-  { id:'src', name:'Custom source',Icon:Plus,         color:'#94A3B8', usage:'available', meta:'Available'     },
+  { id:'custom', name:'Custom source',Icon:Plus,      color:'#94A3B8', usage:'available', meta:'Available'     },
 ];
 const TEMPLATES = [
   { id:'t1', name:'Lead magnet',    desc:'Capture emails with a free download.',  steps:3 },
@@ -1094,12 +1094,13 @@ function Sidebar({ onAIClick, onBuildAIClick, collapsed, onToggleCollapsed, focu
           onClick={() => canvasApi?.current?.addNode({ type:'source', data:{ src:'fb', visitorsNum:0 } })}/>
         <QuickIcon Icon={FileIcon} color="#006CB5" tint="#E6F0F9" tintHover="#CCE0F1" label="Add page"
           onClick={() => canvasApi?.current?.addNode({ type:'page',   data:{ title:'New page', path:'/new', kind:'landing' } })}/>
-        <QuickIcon Icon={Cart}     color="#7C3AED" tint="#F3EEFF" tintHover="#E9DEFF" label="Add checkout"
+        <QuickIcon Icon={Cart}     color="#0891B2" tint="#E0F7FA" tintHover="#B2EBF2" label="Add checkout"
           onClick={() => canvasApi?.current?.addNode({ type:'page',   data:{ title:'Checkout', path:'/checkout', kind:'checkout' } })}/>
         {/* Divider — separates page-creation from flow-logic */}
         <div className="w-px h-5 bg-line-soft mx-0.5"/>
-        {/* Logic cluster */}
-        <QuickIcon Icon={Bars}     color="#7C3AED" tint="#F3EEFF" tintHover="#E9DEFF" label="Add A/B test"
+        {/* Logic cluster — A/B test = orange to read as "test/experiment",
+            Condition = violet to read as "logic/branch". */}
+        <QuickIcon Icon={Bars}     color="#F59E0B" tint="#FEF3C7" tintHover="#FDE68A" label="Add A/B test"
           onClick={() => canvasApi?.current?.addNode({ type:'logic', data:{ kind:'abtest', title:'A/B Test', split:50 } })}/>
         <QuickIcon Icon={Workflow} color="#7C3AED" tint="#F3EEFF" tintHover="#E9DEFF" label="Add condition"
           onClick={() => canvasApi?.current?.addNode({ type:'logic', data:{ kind:'condition', title:'Condition' } })}/>
@@ -1178,15 +1179,18 @@ function Sidebar({ onAIClick, onBuildAIClick, collapsed, onToggleCollapsed, focu
       </div>
 
       <div className="border-t border-line-soft bg-surface-sub p-2.5 shrink-0 space-y-1.5">
-        {/* Primary AI action — opens conversational sidebar mode */}
-        <button onClick={onBuildAIClick} className="w-full flex items-center gap-2 px-3 py-2 rounded-md bg-violet text-white hover:bg-violet-deep transition-colors shadow-xs">
-          <span className="w-7 h-7 rounded-md bg-white/20 text-white flex items-center justify-center ai-ripple">
+        {/* Primary AI action — opens conversational sidebar mode.
+           Style cousin of AI Suggestions below: white card, violet wash.
+           Icon flipped to white square + violet glyph. */}
+        <button onClick={onBuildAIClick} className="w-full flex items-center gap-2 px-3 py-2 rounded-md bg-violet-soft border border-violet/20 hover:border-violet hover:bg-white transition-colors">
+          <span className="w-7 h-7 rounded-md bg-white text-violet flex items-center justify-center shadow-xs ai-ripple">
             <Spark size={14} className="ai-breathe-icon"/>
           </span>
           <div className="flex-1 text-left">
-            <div className="text-[12.5px] font-semibold leading-none">Build with AI</div>
-            <div className="text-[10.5px] text-white/80 mt-0.5">Describe your funnel, AI builds it</div>
+            <div className="text-[12.5px] font-semibold text-ink leading-none">Build with AI</div>
+            <div className="text-[10.5px] text-ink-soft mt-0.5">Describe your funnel, AI builds it</div>
           </div>
+          <ChevronRight size={11} className="text-violet"/>
         </button>
         {/* Secondary — passive suggestions */}
         <button onClick={onAIClick} className="w-full flex items-center gap-2 px-3 py-2 rounded-md bg-white border border-line hover:border-violet hover:bg-violet-soft transition-colors">
@@ -1398,27 +1402,66 @@ function AIPopover({ open, onClose }) {
 
 /* ─── EMPTY CANVAS — staged funnel mark + headline + sub + helper links ─── */
 function EmptyCanvas({ onJumpToTemplates, onJumpToPages }) {
+  /* 3-step start wizard. Replaces the old centred empty-canvas card.
+     Action-oriented: each step is its own card with a CTA. The bottom row
+     offers shortcuts to a template gallery or AI-driven build. */
   return (
-    <div className="absolute inset-0 flex items-center justify-center px-8 pointer-events-none">
-      <div className="text-center max-w-[360px] pointer-events-auto">
-        <div className="canvas-float inline-flex items-center justify-center mb-5 text-brand"
-             style={{ filter: 'drop-shadow(0 4px 12px rgba(0,108,181,0.18))' }}>
-          <FunnelStaged size={72}/>
+    <div className="absolute inset-0 flex items-center justify-center p-6 pointer-events-none">
+      <div className="pointer-events-auto w-full max-w-[640px] mx-auto">
+        <div className="text-center mb-5">
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-ink-soft">Get started</div>
+          <h2 className="text-[19px] font-semibold text-ink mt-1">Build your funnel in 3 steps</h2>
+          <p className="text-[12.5px] text-ink-soft mt-1.5 max-w-[420px] mx-auto leading-relaxed">
+            Add a traffic source, drop in your first page, and connect them. You can always start from a template instead.
+          </p>
         </div>
-        <h2 className="text-[18px] font-semibold text-ink mb-1.5">Your funnel is blank</h2>
-        <p className="text-[13px] text-ink-muted leading-relaxed mb-5">
-          Drag a page or traffic source from the sidebar to start building your funnel.
-        </p>
-        <div className="flex items-center justify-center gap-3 text-[12.5px]">
-          <button onClick={onJumpToTemplates} className="inline-flex items-center gap-1.5 text-brand hover:text-brand-hover font-medium transition-colors">
-            <StarIcon size={12}/> Pick a template
+
+        <div className="grid grid-cols-3 gap-3">
+          <WizardStep n={1} accent="#10B981" tint="#ECFDF5" Icon={Globe}
+            title="Add a traffic source"
+            sub="Where do visitors come from? Facebook, Email, YouTube…"
+            cta="Add source" onClick={onJumpToPages}/>
+          <WizardStep n={2} accent="#006CB5" tint="#E6F0F9" Icon={FileIcon}
+            title="Add your first page"
+            sub="Landing page, lead form, sales page, checkout, thank you."
+            cta="Add page" onClick={onJumpToPages}/>
+          <WizardStep n={3} accent="#7C3AED" tint="#F3EEFF" Icon={Workflow}
+            title="Connect the path"
+            sub="Drag from each card's connector dot to draw the next step."
+            cta="Got it" onClick={onJumpToPages}/>
+        </div>
+
+        <div className="mt-4 flex items-center justify-center gap-2 text-[12px]">
+          <button onClick={onJumpToTemplates}
+            className="h-8 px-3 inline-flex items-center gap-1.5 rounded-md bg-white border border-line text-ink-muted hover:text-ink hover:bg-surface-sub transition-colors">
+            <Workflow size={12}/> Use a template
           </button>
-          <span className="text-line-strong">·</span>
-          <button onClick={onJumpToPages} className="inline-flex items-center gap-1.5 text-brand hover:text-brand-hover font-medium transition-colors">
-            <FileIcon size={12}/> Browse pages
+          <button onClick={() => window.dispatchEvent(new CustomEvent('open-build-ai'))}
+            className="h-8 px-3 inline-flex items-center gap-1.5 rounded-md bg-violet-soft border border-violet/20 text-violet hover:bg-white transition-colors">
+            <Spark size={12}/> Ask AI to build it
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function WizardStep({ n, accent, tint, Icon, title, sub, cta, onClick }) {
+  return (
+    <div className="bg-white border border-line-soft rounded-lg p-3.5 hover:border-line-strong hover:shadow-card transition-all">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="w-7 h-7 rounded-md inline-flex items-center justify-center" style={{ background: tint, color: accent }}>
+          <Icon size={14}/>
+        </span>
+        <span className="text-[10px] font-bold uppercase tracking-wider text-ink-soft">Step {n}</span>
+      </div>
+      <div className="text-[12.5px] font-semibold text-ink leading-tight">{title}</div>
+      <div className="text-[11px] text-ink-soft mt-1 leading-relaxed">{sub}</div>
+      <button onClick={onClick}
+        className="mt-2.5 h-7 px-2.5 inline-flex items-center gap-1 rounded text-[11.5px] font-semibold text-white transition-opacity hover:opacity-90"
+        style={{ background: accent }}>
+        {cta} <ChevronRight size={11}/>
+      </button>
     </div>
   );
 }
@@ -1551,7 +1594,7 @@ const PAGE_ICON_LOOKUP = {
 };
 
 function PageNode({ node, selected, mode, onSelect, onDragStart, onConnectStart, onRemove }) {
-  const readonly = mode === 'analyse';
+  const readonly = mode !== 'build';
   const baseT = PAGE_TYPE[node.data.pageType] || PAGE_TYPE.custom;
   const isCustom = node.data.pageType === 'custom';
   // Custom mode reads icon/color from data; otherwise uses type defaults.
@@ -1744,7 +1787,7 @@ function hexToRGB(hex) {
 /* ─── SOURCE NODE — single floating output handle, threshold colors, count-up
    animation, action chips floating above on hover, draggable body. ─── */
 function SourceNode({ node, selected, onSelect, onDragStart, onConnectStart, onChangeSource, onRemove, target, mode }) {
-  const readonly = mode === 'analyse';
+  const readonly = mode !== 'build';
   const src = SOURCE_BY_ID[node.data.src] || SOURCES[0];
   const Ic = src.Icon;
   const count = target?.count || 0;
@@ -1919,7 +1962,7 @@ const LOGIC_KIND = {
   abtest:    { label: 'A/B Test',  subtitle: 'random split',     primaryBranch:'a',   secondaryBranch:'b'  },
 };
 function LogicNode({ node, selected, onSelect, onDragStart, onConnectStart, onRemove, outgoingCount, mode }) {
-  const readonly = mode === 'analyse';
+  const readonly = mode !== 'build';
   const kind = LOGIC_KIND[node.data.kind] || LOGIC_KIND.condition;
   const Ic = node.data.kind === 'abtest' ? Bars : Workflow;
   const VIOLET = '#7C3AED';
@@ -2292,7 +2335,7 @@ function EdgeOverlays({ nodes, edges, zoom, hovered, onHover, onRemove, onInsert
         const fromVisitors = a.type === 'source' ? (a.data.visitorsNum || 1) : null;
         const rate = fromVisitors ? Math.round((vol / fromVisitors) * 100) : null;
         const hasLabel = !!e.label;
-        const showInteractive = isHovered;
+        const showInteractive = isHovered && mode === 'build';
         const showStats = !isHovered && mode === 'analyse' && vol > 0;
 
         return (
@@ -2319,17 +2362,90 @@ function EdgeOverlays({ nodes, edges, zoom, hovered, onHover, onRemove, onInsert
                       style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}>{e.label}</text>
               </g>
             )}
-            {/* mid-pill stats — Analyse mode, edge has volume, not currently hovered */}
+            {/* Mid-pill stats — Analyse mode, edge has volume.
+               Now embeds a green stats button at the right end of the pill so
+               users can tap straight into the path-stats popover (no longer
+               hover-gated). Generous L/R padding for legibility. */}
             {showStats && (() => {
               const text = rate != null ? `${formatVolume(vol)} · ${rate}%` : formatVolume(vol);
-              const w = text.length * 6.5 + 16;
+              // Padding: 14 left + text + 6 spacer + 18 button + 6 right = full width
+              const padL = 14, padR = 6, btnW = 18, spacer = 6;
+              const textW = text.length * 6.6;
+              const w = padL + textW + spacer + btnW + padR;
+              const cy = geo.my + (hasLabel ? 14 : 0);
+              const isOpen = statsOpen === i;
               return (
-                <g transform={`translate(${geo.mx}, ${geo.my + (hasLabel ? 14 : 0)})`} style={{ pointerEvents: 'none' }}>
-                  <rect x={-w/2} y="-12" width={w} height="24" rx="12"
+                <g key={`pill-${i}`} transform={`translate(${geo.mx}, ${cy})`} style={{ pointerEvents: 'auto' }}>
+                  {/* outer pill — slightly taller for visual weight */}
+                  <rect x={-w/2} y="-13" width={w} height="26" rx="13"
                         fill="white" stroke="#E5E7EB" strokeWidth="1"
-                        style={{ filter: 'drop-shadow(0 1px 2px rgba(15,23,42,0.06))' }}/>
-                  <text textAnchor="middle" y="4.5" fontSize="12" fontWeight="700" fill="#0F172A"
-                        style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}>{text}</text>
+                        style={{ filter: 'drop-shadow(0 1px 2px rgba(15,23,42,0.06))', pointerEvents: 'none' }}/>
+                  {/* number + percent */}
+                  <text x={-w/2 + padL + textW/2} y="4.5" textAnchor="middle" fontSize="12" fontWeight="700" fill="#0F172A"
+                        style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif', pointerEvents: 'none' }}>{text}</text>
+                  {/* embedded green stats button at right end */}
+                  <foreignObject x={w/2 - padR - btnW} y={-9} width={btnW} height={btnW} style={{ overflow: 'visible' }}>
+                    <button onClick={(ev) => { ev.stopPropagation(); setStatsOpen(isOpen ? null : i); }}
+                      title="Path stats"
+                      className="w-[18px] h-[18px] inline-flex items-center justify-center rounded-full bg-good text-white hover:bg-good-deep transition-colors shadow-xs">
+                      <TrendingUp size={10}/>
+                    </button>
+                  </foreignObject>
+                  {/* popover anchored under the button */}
+                  {isOpen && (() => {
+                    const e2 = edges[i];
+                    const fromNode = nodes.find(n => n.id === e2?.from);
+                    const toNode   = nodes.find(n => n.id === e2?.to);
+                    const fromTitle = fromNode?.data?.title || (fromNode?.type === 'source' ? (SOURCES.find(ss => ss.id === fromNode?.data?.src)?.name || 'Source') : 'From');
+                    const toTitle   = toNode?.data?.title   || 'To';
+                    const conv = vol ? Math.round((vol / Math.max(1, fromNode?.data?.visitorsNum || fromNode?.data?.visitors || 100)) * 100) : 0;
+                    const drop = Math.max(0, 100 - conv);
+                    return (
+                      <foreignObject x={-130} y={18} width={260} height={300} style={{ overflow: 'visible' }}>
+                        <div onClick={(ev) => ev.stopPropagation()}
+                          className="ctx-menu w-[260px] bg-white rounded-lg shadow-menu overflow-hidden">
+                          {/* Light green muted heading — readable, not heavy */}
+                          <div className="px-3 py-2.5 bg-good-soft border-b border-good/30 flex items-center gap-2">
+                            <span className="w-5 h-5 rounded-full bg-good text-white inline-flex items-center justify-center shrink-0">
+                              <TrendingUp size={10}/>
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-[10px] uppercase tracking-wider text-good-deep font-semibold">Path stats</div>
+                              <div className="text-[12px] font-semibold leading-tight truncate text-ink mt-0.5">
+                                {fromTitle} <span className="text-ink-soft">→</span> {toTitle}
+                              </div>
+                            </div>
+                            <button onClick={() => setStatsOpen(null)}
+                              className="w-5 h-5 inline-flex items-center justify-center rounded hover:bg-white/60 transition-colors text-good-deep">
+                              <X size={11}/>
+                            </button>
+                          </div>
+                          {/* Stats body — smaller numbers (13px) */}
+                          <div className="p-3 grid grid-cols-2 gap-x-3 gap-y-2">
+                            <div>
+                              <div className="text-[10px] uppercase tracking-wider text-ink-soft">Visitors</div>
+                              <div className="text-[13px] font-semibold text-ink tabular-nums leading-tight mt-0.5">{vol.toLocaleString()}</div>
+                            </div>
+                            <div>
+                              <div className="text-[10px] uppercase tracking-wider text-ink-soft">Conversion</div>
+                              <div className="text-[13px] font-semibold text-good-deep tabular-nums leading-tight mt-0.5">{conv}%</div>
+                            </div>
+                            <div>
+                              <div className="text-[10px] uppercase tracking-wider text-ink-soft">Drop-off</div>
+                              <div className="text-[13px] font-semibold text-bad-deep tabular-nums leading-tight mt-0.5">{drop}%</div>
+                            </div>
+                            <div>
+                              <div className="text-[10px] uppercase tracking-wider text-ink-soft">Time-to-next</div>
+                              <div className="text-[13px] font-semibold text-ink tabular-nums leading-tight mt-0.5">0:42</div>
+                            </div>
+                          </div>
+                          <div className="px-3 py-2 bg-surface-sub border-t border-line-soft text-[10.5px] text-ink-soft leading-snug">
+                            From last 7 days. Drop-off = visitors who entered this edge but didn't reach the next step.
+                          </div>
+                        </div>
+                      </foreignObject>
+                    );
+                  })()}
                 </g>
               );
             })()}
@@ -2342,76 +2458,7 @@ function EdgeOverlays({ nodes, edges, zoom, hovered, onHover, onRemove, onInsert
                 onInsert={() => onInsert(i, geo.mx, geo.my)}
                 onRemove={() => onRemove(i)}/>
 
-            {mode === 'analyse' && (() => {
-              const isOpen = statsOpen === i;
-              const e2 = edges[i];
-              const fromNode = nodes.find(n => n.id === e2?.from);
-              const toNode   = nodes.find(n => n.id === e2?.to);
-              const fromTitle = fromNode?.data?.title || (fromNode?.type === 'source' ? (SOURCES.find(s => s.id === fromNode?.data?.src)?.name || 'Source') : 'From');
-              const toTitle   = toNode?.data?.title   || 'To';
-              // Pick chip colour from source-node's brand colour (or brand blue)
-              const fromColor = fromNode?.type === 'source'
-                ? (SOURCES.find(s => s.id === fromNode?.data?.src)?.color || '#006CB5')
-                : (PAGE_TYPE[fromNode?.data?.pageType]?.color || '#006CB5');
-              // Mock figures derived from edge volume
-              const vol = e2?.volume || 0;
-              const conv = vol ? Math.round((vol / Math.max(1, fromNode?.data?.visitorsNum || fromNode?.data?.visitors || 100)) * 100) : 0;
-              const drop = Math.max(0, 100 - conv);
-              return (
-                <foreignObject x={geo.mx + 22} y={geo.my - 13} width={30} height={26} style={{ overflow: 'visible', pointerEvents: 'auto' }}>
-                  <div style={{ width: 26, position: 'relative' }}>
-                    <button onClick={(ev) => { ev.stopPropagation(); setStatsOpen(isOpen ? null : i); }}
-                      title={`${fromTitle} → ${toTitle}`}
-                      className="w-[26px] h-[26px] inline-flex items-center justify-center rounded-full text-white shadow-card hover:shadow-menu transition-shadow"
-                      style={{ background: fromColor }}>
-                      <TrendingUp size={13}/>
-                    </button>
-                    {isOpen && (
-                      <div onClick={(ev) => ev.stopPropagation()}
-                        className="absolute left-1/2 -translate-x-1/2 top-9 z-50 w-[280px] bg-white rounded-lg border border-line shadow-menu overflow-hidden ctx-menu"
-                        style={{ pointerEvents: 'auto' }}>
-                        {/* Coloured headline strip */}
-                        <div className="px-3 py-2.5 text-white flex items-center gap-2 relative" style={{ background: fromColor }}>
-                          <TrendingUp size={13}/>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-[10.5px] uppercase tracking-wider opacity-85">Path stats</div>
-                            <div className="text-[12.5px] font-semibold leading-tight truncate">
-                              {fromTitle} <span className="opacity-70">→</span> {toTitle}
-                            </div>
-                          </div>
-                          <button onClick={() => setStatsOpen(null)}
-                            className="w-5 h-5 inline-flex items-center justify-center rounded hover:bg-white/20 transition-colors">
-                            <X size={11}/>
-                          </button>
-                        </div>
-                        {/* Stats body — bigger numbers, two-column */}
-                        <div className="p-3 grid grid-cols-2 gap-x-3 gap-y-2">
-                          <div>
-                            <div className="text-[10px] uppercase tracking-wider text-ink-soft">Visitors</div>
-                            <div className="text-[15px] font-semibold text-ink tabular-nums leading-tight mt-0.5">{vol.toLocaleString()}</div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] uppercase tracking-wider text-ink-soft">Conversion</div>
-                            <div className="text-[15px] font-semibold text-good-deep tabular-nums leading-tight mt-0.5">{conv}%</div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] uppercase tracking-wider text-ink-soft">Drop-off</div>
-                            <div className="text-[15px] font-semibold text-ink tabular-nums leading-tight mt-0.5">{drop}%</div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] uppercase tracking-wider text-ink-soft">Time-to-next</div>
-                            <div className="text-[15px] font-semibold text-ink tabular-nums leading-tight mt-0.5">0:42</div>
-                          </div>
-                        </div>
-                        <div className="px-3 py-2 bg-surface-sub border-t border-line-soft text-[10.5px] text-ink-soft leading-snug">
-                          From last 7 days. Drop-off = visitors who entered this edge but didn't reach the next step.
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </foreignObject>
-              );
-            })()}
+
             </>)}
           </g>
         );
@@ -3552,7 +3599,8 @@ function DetailsPage({ node, api, mode }) {
   const isAnalyse = mode === 'analyse';
   return (
     <div className="px-4 py-3 space-y-4">
-      {/* Performance section */}
+      {/* Performance — mirrors the analyse-mode card stats so the
+         right-panel reflects what's on the card 1:1. */}
       <InspSection label="Performance" right={isAnalyse ? <span className="text-[10px] text-ink-soft">In funnel</span> : null}>
         <Stat label="Unique visitors" value={visitors?.toLocaleString() || '—'}/>
         <Stat label="Online now" value={
@@ -3562,6 +3610,7 @@ function DetailsPage({ node, api, mode }) {
           </span>
         }/>
         <Stat label="Conversion to next" value={rate != null ? rate.toFixed(0) + '%' : '—'} accent={rate != null ? 'good' : null}/>
+        <Stat label="Drop-off" value={rate != null ? Math.max(0, 100 - rate).toFixed(0) + '%' : '—'} accent={rate != null && rate < 30 ? 'bad' : null}/>
         <Stat label="Avg. time on page" value={avgTime}/>
       </InspSection>
 
@@ -3614,14 +3663,13 @@ function DetailsSource({ node, api, mode }) {
         <select value={node.data.src || 'fb'} onChange={(e) => api.updateNodeData(node.id, { src: e.target.value })}
           className="w-full h-8 px-2 text-[11.5px] text-ink bg-surface-sub border border-line-soft rounded outline-none focus:border-brand">
           {SOURCES.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-          <option value="custom">Custom source…</option>
         </select>
       </InspSection>
 
       {/* Custom-source UI: name + color, no connection */}
       {isCustom && (
         <>
-          <InspSection label="Custom source">
+          <InspSection label="Source details">
             <Field label="Name">
               <input value={customName} onChange={(e) => api.updateNodeData(node.id, { customName: e.target.value })}
                 className="w-full h-7 px-2 text-[11.5px] text-ink bg-surface-sub border border-line-soft rounded outline-none focus:border-brand"/>
@@ -4346,9 +4394,18 @@ function BranchRow({ letter, color, label }) {
 /* SuggestedWin — V5's standout pattern. AI-generated optimisation card with
    subtle violet wash, ripple animation, impact chip on the right, primary CTA. */
 function SuggestedWin({ title, body, impact, cta }) {
+  const [dismissed, setDismissed] = useState(false);
+  if (dismissed) return null;
   return (
     <div className="rounded-md border border-line-soft p-3 relative overflow-hidden"
          style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.06) 0%, rgba(124,58,237,0.02) 60%, transparent 100%)' }}>
+      {/* Dismiss × — top-right corner, lightly muted so it doesn't fight the
+         primary CTA visually. */}
+      <button onClick={() => setDismissed(true)}
+        title="Dismiss"
+        className="absolute top-1.5 right-1.5 w-5 h-5 inline-flex items-center justify-center rounded text-ink-soft hover:text-ink hover:bg-white/60 transition-colors z-10">
+        <X size={11}/>
+      </button>
       <div className="flex items-start gap-2 mb-2">
         <span className="ai-ripple w-5 h-5 rounded-md inline-flex items-center justify-center flex-shrink-0"
               style={{ background: 'rgba(124,58,237,0.16)', color: '#7C3AED' }}>
@@ -4671,7 +4728,7 @@ function OptimiseSuggestionModal({ open, nodeTitle, onClose }) {
     <div className="fixed inset-0 z-[9990] flex items-end justify-center pb-8 bg-ink/15"
          onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()}
-        className="ctx-menu w-[560px] max-w-[92vw] bg-white rounded-lg shadow-menu border border-line overflow-hidden">
+        className="ctx-menu w-[560px] max-w-[92vw] bg-white rounded-lg shadow-menu overflow-hidden">
         {/* Header */}
         <div className="flex items-center gap-2 px-4 py-3 border-b border-line-soft">
           <span className="w-7 h-7 rounded-md bg-violet-soft text-violet flex items-center justify-center ai-ripple">
@@ -4885,20 +4942,14 @@ function BuildWithAIChat({ open, onClose }) {
         </div>
       </div>
 
-      {/* Collapsed section bar — sections still visible as headers, just inert */}
+      {/* Collapsed sections — same look as the regular sidebar (uppercase
+          label, chevron, count pill), just rendered closed. The chat takes
+          over the body; the sections sit at top as a visible reference. */}
       <div className="border-b border-line-soft shrink-0">
-        {[
-          { label: 'Add Pages',        count: 12 },
-          { label: 'Current Funnel',   count: 0  },
-          { label: 'Traffic',          count: 9  },
-          { label: 'Funnel Templates', count: 7  },
-        ].map(s => (
-          <div key={s.label} className="px-4 py-1.5 flex items-center gap-2 text-[11px] text-ink-soft border-b border-line-soft last:border-b-0 opacity-60">
-            <ChevronRight size={9} className="text-ink-soft"/>
-            <span className="font-medium text-ink-muted">{s.label}</span>
-            <span className="ml-auto tabular-nums">{s.count}</span>
-          </div>
-        ))}
+        <Section title="Add Pages"        count={12} open={false} onToggle={() => {}}/>
+        <Section title="Current Funnel"   count={0}  open={false} onToggle={() => {}}/>
+        <Section title="Traffic"          count={9}  open={false} onToggle={() => {}}/>
+        <Section title="Funnel Templates" count={7}  open={false} onToggle={() => {}} last/>
       </div>
 
       {/* Chat scroll */}
@@ -4956,9 +5007,9 @@ function OptimiseEmptyState({ funnel }) {
       <div className="px-4 py-3 border-b border-line-soft shrink-0">
         <div className="text-[10.5px] font-semibold uppercase tracking-wider text-ink-soft">Optimise queue</div>
         <div className="text-[13px] font-semibold text-ink mt-0.5 truncate">{funnel?.name || 'Untitled funnel'}</div>
-        <div className="mt-1.5 flex items-center gap-1.5">
+        <div className="mt-1 text-[10.5px] text-ink-soft inline-flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-violet"/>
-          <span className="text-[10.5px] text-ink-soft">{URGENT.length} urgent · {GROWTH.length} growth · {DONE.length} completed</span>
+          {URGENT.length} urgent · {GROWTH.length} growth · {DONE.length} completed
         </div>
       </div>
 
@@ -5048,6 +5099,12 @@ export default function App() {
     const handler = () => setNewFunnelOpen(true);
     window.addEventListener('open-new-funnel', handler);
     return () => window.removeEventListener('open-new-funnel', handler);
+  }, []);
+  // Wizard "Ask AI to build it" → open the Build with AI chat sidebar.
+  useEffect(() => {
+    const handler = () => setAiChatOpen(true);
+    window.addEventListener('open-build-ai', handler);
+    return () => window.removeEventListener('open-build-ai', handler);
   }, []);
   const [project, setProject] = useState(PROJECTS[0]);
   const [funnel, setFunnel] = useState(FUNNELS[0]);
