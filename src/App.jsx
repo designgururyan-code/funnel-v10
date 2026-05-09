@@ -2145,33 +2145,36 @@ function getFloatingAnchor(node, towardX, towardY, mode, isOutgoing) {
 }
 
 function computeEdgeGeometry(a, b, allNodes, mode, edge) {
-  /* Orthogonal routing — replaces the previous bezier curves.
+  /* Smart orthogonal routing — right-angle paths that detour around blocking
+     cards instead of cutting through them.
 
-     Right-angle paths read like industry-standard flow tools (Linear, n8n,
-     Whimsical). Each edge:
-       1. Exits the source's right-middle, goes RIGHT for STUB px ("source stub")
-       2. Turns vertically (UP or DOWN) to align with destination's Y
-       3. Goes vertically until aligned with destination's Y
-       4. Turns RIGHT and goes RIGHT to enter destination's left-middle
+     Path strategy:
+       FORWARD case (source x < destination x — typical L→R flow):
+         1. Exit source right-middle, go right STUB px
+         2. Find a clear vertical-run column between source and destination
+            that doesn't cut through any non-endpoint card
+         3. Vertical run up/down to destination's Y
+         4. Horizontal to destination left-middle
 
-     For branched edges (Y/N or A/B), the source-side stub is offset
-     vertically by BRANCH_OFFSET so the two branches visibly fan apart at
-     the source side before turning toward their destinations.
+       LOOP-BACK case (source x >= destination x — backwards flow, e.g.
+       a condition feeding a card on its left):
+         1. Exit source right-middle, go right STUB px
+         2. Go up OR down, clearing the entire row of cards
+         3. Travel left ABOVE/BELOW the card row
+         4. Drop down (or up) and turn right into destination's left-middle
 
-     The path uses small radius corners (CORNER_R) for a polished feel
-     instead of sharp 90° angles.
+     For branched edges (Y/N or A/B), the source side is offset vertically
+     by BRANCH_OFFSET so the two branches visibly fan apart.
 
-     Output API stays compatible with bezier version (path, sx/sy/ex/ey,
-     mx/my, bx/by, ang) so callers (collision detection, pill positioning,
-     arrow rendering) work without changes. */
+     If there's no clear horizontal stub for the pill, the pill HIDES rather
+     than render in a broken spot. */
 
   const sx = a.x + NODE_W[a.type];
   const sy = a.y + getNodeH(a, mode) / 2;
   const ex = b.x;
   const ey = b.y + getNodeH(b, mode) / 2;
 
-  /* Branch offset — Y/A goes up at the source, N/B goes down. This visually
-     splits the two branches as they leave a logic card. */
+  /* Branch offset — Y/A goes up at the source, N/B goes down. */
   const BRANCH_OFFSET = 22;
   let sourceY = sy;
   if (edge && edge.branch) {
@@ -2179,96 +2182,193 @@ function computeEdgeGeometry(a, b, allNodes, mode, edge) {
     if (edge.branch === 'no'  || edge.branch === 'b') sourceY = sy + BRANCH_OFFSET;
   }
 
-  const STUB = 30;       /* horizontal segment length at source + destination */
-  const CORNER_R = 6;    /* corner radius for polished bends */
-  const GAP = 12;        /* clearance before destination — same as old bezier */
-
-  /* Path waypoints:
-       (sx, sy)         — exit source center vertically (then ramp up/down to sourceY if branched)
-       (sx, sourceY)    — branched offset (or same as sy)
-       (sx + STUB, sourceY)  — end of source stub
-       (midX, sourceY)  — start of vertical run
-       (midX, ey)       — end of vertical run
-       (ex - GAP, ey)   — destination stub start
-       (ex - GAP, ey)   — arrow lands here (12px short of card edge) */
-
-  const midX = (sx + STUB + ex - STUB) / 2;
+  const STUB = 30;
+  const CORNER_R = 10;        /* polished rounded corners */
+  const GAP = 12;
+  const DETOUR_PAD = 24;      /* how far to clear cards on detour */
   const exShort = ex - GAP;
+  const isLoopBack = sx + STUB > exShort - STUB;
 
-  /* Build path with rounded corners. We use SVG arc commands for the bends. */
-  let path = `M ${sx},${sy}`;
-  if (sourceY !== sy) {
-    /* ramp from sy → sourceY with two small arcs (short vertical) */
-    const rampSign = Math.sign(sourceY - sy);
-    path += ` L ${sx},${sourceY - rampSign * CORNER_R}`;
-    path += ` Q ${sx},${sourceY} ${sx + CORNER_R},${sourceY}`;
-  } else {
-    path += ` L ${sx + CORNER_R},${sy}`;
-  }
-  /* horizontal source stub */
-  path += ` L ${midX - CORNER_R},${sourceY}`;
+  /* Helper — does a horizontal segment at y=Y from x=X0 to x=X1 cut through
+     any non-endpoint card with `pad` clearance? */
+  const segmentCrossesCard = (x0, x1, y, pad = 8) => {
+    const xMin = Math.min(x0, x1) - pad, xMax = Math.max(x0, x1) + pad;
+    return allNodes.some(n => {
+      if (n.id === a.id || n.id === b.id) return false;
+      const nw = NODE_W[n.type], nh = getNodeH(n, mode);
+      return xMax > n.x && xMin < n.x + nw &&
+             y > n.y - pad && y < n.y + nh + pad;
+    });
+  };
+  /* Helper — does a vertical segment at x=X from y=Y0 to y=Y1 cut through
+     any non-endpoint card with `pad` clearance? */
+  const verticalCrossesCard = (x, y0, y1, pad = 8) => {
+    const yMin = Math.min(y0, y1) - pad, yMax = Math.max(y0, y1) + pad;
+    return allNodes.some(n => {
+      if (n.id === a.id || n.id === b.id) return false;
+      const nw = NODE_W[n.type], nh = getNodeH(n, mode);
+      return yMax > n.y && yMin < n.y + nh &&
+             x > n.x - pad && x < n.x + nw + pad;
+    });
+  };
 
-  if (Math.abs(ey - sourceY) > 1) {
-    /* corner: turn from horizontal to vertical */
-    const vSign = Math.sign(ey - sourceY);
-    path += ` Q ${midX},${sourceY} ${midX},${sourceY + vSign * CORNER_R}`;
-    /* vertical run */
-    path += ` L ${midX},${ey - vSign * CORNER_R}`;
-    /* corner: turn from vertical to horizontal */
-    path += ` Q ${midX},${ey} ${midX + CORNER_R},${ey}`;
-  } else {
-    /* nearly aligned — small offset still needs a smooth pass-through */
-    path += ` L ${midX + CORNER_R},${ey}`;
-  }
-  /* horizontal destination stub */
-  path += ` L ${exShort},${ey}`;
+  let path = '';
+  let mx = 0, my = 0;       /* pill position */
+  let pillFits = false;     /* whether we found a clear horizontal segment for the pill */
+  let badgeX = 0, badgeY = 0;
 
-  /* Pill position — sits on the horizontal segment between the cards (NOT
-     on the vertical run). Specifically on the destination-side horizontal
-     stub, centered between the vertical run and the destination card edge.
-     This guarantees:
-       - The pill never overlaps the source or destination card
-       - There's always visible connection line on BOTH sides of the pill
-         (between the source and the pill, and between the pill and the
-         destination)
-     If the horizontal stub is too short to fit the pill with margin, fall
-     back to the source-side stub (which is also always horizontal). */
-  const PILL_HALF = 56;       /* half of 112px pill width */
-  const PILL_MARGIN = 12;     /* clearance from card edges and bends */
-  const destStubLen = exShort - midX;
-  const sourceStubLen = midX - sx;
-  let mx, my;
-  if (destStubLen >= PILL_HALF * 2 + PILL_MARGIN * 2) {
-    /* enough room on the destination stub — center pill there */
-    mx = midX + destStubLen / 2;
-    my = ey;
-  } else if (sourceStubLen >= PILL_HALF * 2 + PILL_MARGIN * 2) {
-    /* fallback: source stub */
-    mx = sx + sourceStubLen / 2;
-    my = sourceY;
-  } else {
-    /* extreme case: cards too close, neither stub fits the pill cleanly.
-       Land on whichever is longer and trust collision detection to nudge. */
-    if (destStubLen >= sourceStubLen) {
+  if (!isLoopBack) {
+    /* === FORWARD case ===
+       Find a clear vertical-run column. Start at the geometric midpoint
+       and search left/right until we find a column that doesn't intersect
+       any blocking card. */
+    const idealMidX = (sx + STUB + exShort - STUB) / 2;
+    let midX = idealMidX;
+    /* Search candidates: ideal, then progressively further left and right */
+    const candidates = [idealMidX];
+    for (let off = 20; off <= 200; off += 20) {
+      candidates.push(idealMidX + off, idealMidX - off);
+    }
+    /* Find first candidate where vertical run doesn't cross any card */
+    for (const cand of candidates) {
+      if (cand <= sx + STUB) continue;
+      if (cand >= exShort - STUB) continue;
+      if (!verticalCrossesCard(cand, sourceY, ey)) {
+        midX = cand;
+        break;
+      }
+    }
+
+    /* Build path with rounded corners */
+    const buildForward = () => {
+      let p = `M ${sx},${sy}`;
+      /* ramp from sy → sourceY if branched */
+      if (sourceY !== sy) {
+        const rampSign = Math.sign(sourceY - sy);
+        p += ` L ${sx},${sourceY - rampSign * CORNER_R}`;
+        p += ` Q ${sx},${sourceY} ${sx + CORNER_R},${sourceY}`;
+      } else {
+        p += ` L ${sx + CORNER_R},${sy}`;
+      }
+      /* source stub → vertical run */
+      if (Math.abs(ey - sourceY) > 1) {
+        p += ` L ${midX - CORNER_R},${sourceY}`;
+        const vSign = Math.sign(ey - sourceY);
+        p += ` Q ${midX},${sourceY} ${midX},${sourceY + vSign * CORNER_R}`;
+        p += ` L ${midX},${ey - vSign * CORNER_R}`;
+        p += ` Q ${midX},${ey} ${midX + CORNER_R},${ey}`;
+        p += ` L ${exShort},${ey}`;
+      } else {
+        /* near-aligned — straight horizontal */
+        p += ` L ${exShort},${ey}`;
+      }
+      return p;
+    };
+    path = buildForward();
+
+    /* Pill placement — destination-side stub if it fits, else source-side */
+    const PILL_HALF = 56, PILL_MARGIN = 14;
+    const destStubLen = exShort - midX;
+    const sourceStubLen = midX - sx;
+    if (destStubLen >= PILL_HALF * 2 + PILL_MARGIN * 2) {
       mx = midX + destStubLen / 2;
       my = ey;
-    } else {
+      pillFits = true;
+    } else if (sourceStubLen >= PILL_HALF * 2 + PILL_MARGIN * 2) {
       mx = sx + sourceStubLen / 2;
       my = sourceY;
+      pillFits = true;
+    } else {
+      /* Last-resort: pick longer stub center; collision pass may nudge */
+      if (destStubLen >= sourceStubLen) {
+        mx = midX + destStubLen / 2;
+        my = ey;
+      } else {
+        mx = sx + sourceStubLen / 2;
+        my = sourceY;
+      }
     }
+
+    badgeX = exShort - 24;
+    badgeY = ey;
+  } else {
+    /* === LOOP-BACK case ===
+       Source is to the right of destination. Route up or down around the
+       row of cards. Pick whichever direction has more open space. */
+
+    /* Identify cards in the band between source and destination horizontally */
+    const xLo = Math.min(ex, sx) - 20;
+    const xHi = Math.max(ex, sx) + 20;
+    const blockers = allNodes.filter(n => {
+      if (n.id === a.id || n.id === b.id) return false;
+      const nw = NODE_W[n.type];
+      return n.x + nw > xLo && n.x < xHi;
+    });
+    /* Find topmost and bottommost edges of blockers */
+    let topY = Math.min(sy, ey), bottomY = Math.max(sy, ey);
+    blockers.forEach(n => {
+      const nh = getNodeH(n, mode);
+      topY = Math.min(topY, n.y);
+      bottomY = Math.max(bottomY, n.y + nh);
+    });
+    /* Decide above or below — pick the direction that's a shorter detour */
+    const goAbove = (topY - DETOUR_PAD) < (bottomY + DETOUR_PAD);
+    const detourY = goAbove ? topY - DETOUR_PAD : bottomY + DETOUR_PAD;
+
+    const buildLoopBack = () => {
+      let p = `M ${sx},${sy}`;
+      /* ramp to sourceY (branched) */
+      if (sourceY !== sy) {
+        const rampSign = Math.sign(sourceY - sy);
+        p += ` L ${sx},${sourceY - rampSign * CORNER_R}`;
+        p += ` Q ${sx},${sourceY} ${sx + CORNER_R},${sourceY}`;
+      } else {
+        p += ` L ${sx + CORNER_R},${sy}`;
+      }
+      /* short source stub */
+      const sStubX = sx + STUB;
+      p += ` L ${sStubX - CORNER_R},${sourceY}`;
+      /* corner: turn vertically to detourY */
+      const vSign = Math.sign(detourY - sourceY);
+      p += ` Q ${sStubX},${sourceY} ${sStubX},${sourceY + vSign * CORNER_R}`;
+      p += ` L ${sStubX},${detourY - vSign * CORNER_R}`;
+      /* corner: turn horizontally going LEFT toward destination */
+      p += ` Q ${sStubX},${detourY} ${sStubX - CORNER_R},${detourY}`;
+      /* horizontal traverse leftward at detourY */
+      const dStubX = ex - STUB;
+      p += ` L ${dStubX + CORNER_R},${detourY}`;
+      /* corner: turn vertically toward destination Y */
+      const v2Sign = Math.sign(ey - detourY);
+      p += ` Q ${dStubX},${detourY} ${dStubX},${detourY + v2Sign * CORNER_R}`;
+      p += ` L ${dStubX},${ey - v2Sign * CORNER_R}`;
+      /* corner: turn horizontally toward destination */
+      p += ` Q ${dStubX},${ey} ${dStubX + CORNER_R},${ey}`;
+      p += ` L ${exShort},${ey}`;
+      return p;
+    };
+    path = buildLoopBack();
+
+    /* Pill on the long horizontal traverse at detourY (the segment going left) */
+    const PILL_HALF = 56, PILL_MARGIN = 14;
+    const traverseLen = (sx + STUB) - (ex - STUB);
+    if (traverseLen >= PILL_HALF * 2 + PILL_MARGIN * 2) {
+      mx = (sx + STUB + ex - STUB) / 2;
+      my = detourY;
+      pillFits = true;
+    } else {
+      /* Fall back to the destination stub */
+      mx = ex - STUB / 2 - GAP / 2;
+      my = ey;
+    }
+
+    badgeX = exShort - 24;
+    badgeY = ey;
   }
 
-  /* Badge anchor — near destination so Y/N badge reads at entry */
-  const bx = exShort - 24;
-  const by = ey;
-
-  /* Arrow tangent — always horizontal at destination since we enter from
-     the left going right. ang=0 means straight right. */
-  const ang = 0;
-
   return { path, sx, sy, ex, ey,
-           cx1: sx + STUB, cy1: sourceY, cx2: midX, cy2: ey,
-           mx, my, bx, by, ang };
+           cx1: sx + STUB, cy1: sourceY, cx2: 0, cy2: ey,
+           mx, my, bx: badgeX, by: badgeY, ang: 0,
+           pillFits };
 }
 
 
@@ -3637,9 +3737,12 @@ function Canvas({ mode, demoState, onDemoStateChange, onJumpToTemplates, onJumpT
               );
             })}
 
-          {/* edges UI overlay — arrow + chip + stats. Renders ABOVE nodes so neither
-              the chip nor the arrow tip is occluded when an endpoint sits behind a card. */}
-          <div className="absolute" style={{ left: 0, top: 0, width: 4000, height: 2000, pointerEvents: 'none' }}>
+          {/* edges UI overlay — arrow + chip + stats popover. Renders ABOVE
+              nodes so neither the chip nor the arrow tip is occluded when an
+              endpoint sits behind a card. z-50 also pushes the popover above
+              the per-card "online now" badges (z-20) so path stats sits over
+              every other piece of canvas chrome. */}
+          <div className="absolute z-50" style={{ left: 0, top: 0, width: 4000, height: 2000, pointerEvents: 'none' }}>
             <EdgeOverlays nodes={nodes} edges={edges} zoom={zoom} hovered={hoveredEdge} onHover={setHoveredEdge}
                           onRemove={removeEdge} onInsert={insertOnEdge} mode={mode}/>
           </div>
@@ -5045,6 +5148,24 @@ function InspectorEmpty({ funnel, canvasNodes = [], mode = "build" }) {
       <div className="flex-1 min-h-0 overflow-y-auto scroll-thin">
         {/* Funnel flow graph — Analyse only */}
         {showDiagnosis && <FunnelGraph canvasNodes={canvasNodes}/>}
+        {/* Stats grid — moved up to sit directly under the graph (was after
+           the health card). 8 stats, 2 cols, white cards with category-colored
+           icon chips. */}
+        <div className="px-4 py-3 grid grid-cols-2 gap-2 stat-stagger">
+          {stats.map((s, i) => (
+            <div key={i} className="bg-white border border-line-soft rounded-md px-2.5 py-2 hover:border-line-strong transition-colors">
+              <div className="flex items-center justify-between">
+                <span className="w-5 h-5 rounded inline-flex items-center justify-center"
+                  style={{ background: s.color + '1a', color: s.color }}>
+                  <s.Icon size={11}/>
+                </span>
+                <span className={`text-[10px] font-semibold tabular-nums ${s.good ? 'text-good-deep' : 'text-bad-deep'}`}>{s.delta}</span>
+              </div>
+              <div className="text-[15px] font-semibold tabular-nums mt-1.5 leading-none" style={{ color: s.color }}>{s.value}</div>
+              <div className="text-[10.5px] text-ink-soft mt-1 leading-none">{s.label}</div>
+            </div>
+          ))}
+        </div>
         {/* Diagnosis-first Analyse callout */}
         {showDiagnosis && (() => {
           const pages = canvasNodes.filter(n => n.type === 'page' && typeof n.data.rate === 'number');
@@ -5054,7 +5175,7 @@ function InspectorEmpty({ funnel, canvasNodes = [], mode = "build" }) {
           const best  = sorted[sorted.length - 1];
           const worstDrop = Math.max(0, 100 - (worst?.data?.rate || 0));
           return (
-            <div className="px-4 pt-3 pb-1">
+            <div className="px-4 pt-1 pb-1">
               <div className="rounded-lg border border-line-soft p-3 bg-white">
                 <div className="flex items-center gap-2 mb-2.5">
                   <span className="w-7 h-7 rounded-md bg-warn-soft text-warn-deep inline-flex items-center justify-center">
@@ -5080,10 +5201,6 @@ function InspectorEmpty({ funnel, canvasNodes = [], mode = "build" }) {
                       <span className="text-good-deep font-semibold tabular-nums"> · {(best?.data?.rate || 0).toFixed(0)}% conversion</span>
                     </div>
                   </div>
-                  <div className="pt-2 border-t border-line-soft">
-                    <div className="text-[10px] uppercase tracking-wider text-ink-soft">Suggested next action</div>
-                    <div className="text-ink leading-snug mt-0.5">Tighten the headline + CTA on <span className="font-semibold">{worst?.data?.title || 'the weakest page'}</span> to lift conversion.</div>
-                  </div>
                 </div>
                 <button onClick={() => window.dispatchEvent(new CustomEvent('open-ai-suggestions'))}
                   className="mt-3 w-full h-7 px-2.5 inline-flex items-center justify-center gap-1 rounded text-[11.5px] font-semibold text-white bg-violet hover:bg-violet-deep transition-colors">
@@ -5093,22 +5210,6 @@ function InspectorEmpty({ funnel, canvasNodes = [], mode = "build" }) {
             </div>
           );
         })()}
-        {/* Stats grid — 8 stats, 2 cols, white cards with category-colored icon chips */}
-        <div className="px-4 py-3 grid grid-cols-2 gap-2 stat-stagger">
-          {stats.map((s, i) => (
-            <div key={i} className="bg-white border border-line-soft rounded-md px-2.5 py-2 hover:border-line-strong transition-colors">
-              <div className="flex items-center justify-between">
-                <span className="w-5 h-5 rounded inline-flex items-center justify-center"
-                  style={{ background: s.color + '1a', color: s.color }}>
-                  <s.Icon size={11}/>
-                </span>
-                <span className={`text-[10px] font-semibold tabular-nums ${s.good ? 'text-good-deep' : 'text-bad-deep'}`}>{s.delta}</span>
-              </div>
-              <div className="text-[15px] font-semibold tabular-nums mt-1.5 leading-none" style={{ color: s.color }}>{s.value}</div>
-              <div className="text-[10.5px] text-ink-soft mt-1 leading-none">{s.label}</div>
-            </div>
-          ))}
-        </div>
 
         {/* Activity feed */}
         <div className="border-t border-line-soft">
@@ -5832,9 +5933,11 @@ function FunnelGraph({ canvasNodes }) {
     .sort((a, b) => a.x - b.x);
   if (pages.length < 2) return null;
   const maxVisitors = Math.max(...pages.map(p => p.data.visitors));
-  const W = 280, H = 130, pad = 6;
+  /* Increased H from 130 → 150 to accommodate bigger labels below bars.
+     Increased barAreaH offset from 36 → 44 for more label breathing room. */
+  const W = 280, H = 150, pad = 6;
   const barW = (W - pad * 2) / pages.length;
-  const barAreaH = H - 36;
+  const barAreaH = H - 44;
   return (
     <div className="px-4 pt-3">
       <div className="rounded-lg border border-line-soft bg-white p-3">
@@ -5873,10 +5976,13 @@ function FunnelGraph({ canvasNodes }) {
                 )}
                 <rect x={x + barW * 0.15} y={y + dropH} width={barW * 0.7} height={convH}
                   fill={color} rx="2"/>
-                <text x={x + barW * 0.5} y={barAreaH + 14} textAnchor="middle" fontSize="8.5" fill="#475569" fontWeight="500">
+                {/* Title label — kept at 8.5px small */}
+                <text x={x + barW * 0.5} y={barAreaH + 14} textAnchor="middle" fontSize="9" fill="#475569" fontWeight="500">
                   {truncTitle}
                 </text>
-                <text x={x + barW * 0.5} y={barAreaH + 24} textAnchor="middle" fontSize="9" fill="#0F172A" fontWeight="700">
+                {/* Visitor number — bumped from 9px to 13px for legibility */}
+                <text x={x + barW * 0.5} y={barAreaH + 30} textAnchor="middle" fontSize="13" fill="#0F172A" fontWeight="700"
+                      style={{ fontVariantNumeric: 'tabular-nums' }}>
                   {visitors >= 1000 ? (visitors / 1000).toFixed(1) + 'k' : visitors}
                 </text>
               </g>
