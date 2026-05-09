@@ -152,6 +152,33 @@ function CanvasInner({
     });
   }, [rf]);
 
+  const insertPageNode = useCallback((pageType, defaults) => {
+    if (!insertPicker) return;
+    const { worldX, worldY } = insertPicker;
+    const id = pageType + '-' + Date.now();
+    const w = NODE_W.page;
+    const newNode = {
+      id,
+      type: 'page',
+      position: {
+        x: Math.round((worldX - w / 2) / 10) * 10,
+        y: Math.round((worldY - 80) / 10) * 10,
+      },
+      data: {
+        pageType,
+        title: defaults.title,
+        path: defaults.path,
+        status: 'draft',
+        visitors: 0,
+        conversions: 0,
+        rate: null,
+      },
+    };
+    setNodes((ns) => [...ns, newNode]);
+    setSelectedNodeId(id);
+    setInsertPicker(null);
+  }, [insertPicker, setNodes]);
+
   const insertLogicNode = useCallback((kind) => {
     if (!insertPicker) return;
     const { worldX, worldY } = insertPicker;
@@ -654,6 +681,7 @@ function CanvasInner({
             snapGrid={[10, 10]}
             minZoom={0.4}
             maxZoom={2}
+            connectionRadius={140}
             fitView={false}
             nodesDraggable={mode === 'build' || mode === 'analyse'}
             nodesConnectable={mode === 'build'}
@@ -702,17 +730,23 @@ function CanvasInner({
               <MenuItem
                 icon={<FileIcon size={13} />}
                 label="Page"
-                onClick={() => setInsertPicker(null)}
+                onClick={() =>
+                  insertPageNode('custom', { title: 'New page', path: '/new-page' })
+                }
               />
               <MenuItem
                 icon={<Cart size={13} />}
                 label="Checkout"
-                onClick={() => setInsertPicker(null)}
+                onClick={() =>
+                  insertPageNode('checkout', { title: 'Checkout', path: '/checkout' })
+                }
               />
               <MenuItem
                 icon={<TrendUp size={13} />}
                 label="Upsell"
-                onClick={() => setInsertPicker(null)}
+                onClick={() =>
+                  insertPageNode('upsell', { title: 'Upsell offer', path: '/upsell' })
+                }
               />
               <MenuDivider />
               <MenuItem
