@@ -243,6 +243,27 @@ body {
   box-shadow: none !important;
 }
 
+/* Drop-target ring during connection drag — pulsed brand-blue ring on every
+   page/logic node. Source nodes can't receive connections (isValidConnection
+   filters them out) so we exclude them. The .is-connecting flag is set on
+   <ReactFlow> while the user is dragging from a handle. */
+.react-flow.is-connecting .react-flow__node-page > div,
+.react-flow.is-connecting .react-flow__node-logic > div {
+  position: relative;
+}
+.react-flow.is-connecting .react-flow__node-page:hover > div::after,
+.react-flow.is-connecting .react-flow__node-logic:hover > div::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 12px;
+  border: 2px solid #006CB5;
+  box-shadow: 0 0 0 4px rgba(0, 108, 181, 0.12);
+  pointer-events: none;
+  animation: livePulse 1.4s ease-out infinite;
+}
+
+
 .react-flow__controls {
   box-shadow: var(--shadow-card);
   border: 1px solid var(--color-line);

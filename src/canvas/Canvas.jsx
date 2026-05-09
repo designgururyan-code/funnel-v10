@@ -10,6 +10,8 @@ import {
   addEdge as rfAddEdge,
 } from '@xyflow/react';
 
+import { createPortal } from 'react-dom';
+
 import {
   DEMO_STATES,
   NODE_W,
@@ -21,9 +23,17 @@ import {
   ViewSwitcher,
   ZoomControls,
   ExportFunnelButton,
+  MenuItem,
+  MenuDivider,
+  FileIcon,
+  Cart,
+  TrendUp,
+  Workflow,
+  Bars,
 } from '../App.jsx';
 
 import { nodesToFlow, edgesToFlow, flowToNode, flowToEdge } from './util/transform.js';
+import { dagreLayout } from './util/layout.js';
 import PageNode from './nodes/PageNode.jsx';
 import SourceNode from './nodes/SourceNode.jsx';
 import LogicNode from './nodes/LogicNode.jsx';
@@ -115,6 +125,79 @@ function CanvasInner({
     setSelectedNodeId(null);
   }, [setNodes, setEdges]);
 
+  const removeEdgeById = useCallback((edgeId) => {
+    setEdges((es) => es.filter((e) => e.id !== edgeId));
+    setSelectedEdgeId(null);
+  }, [setEdges]);
+
+  // Edge-insertion picker — opens at the edge midpoint and lets the user
+  // choose Page / Checkout / Upsell / Condition / A-B test. Same UX as the
+  // old Canvas.
+  const [insertPicker, setInsertPicker] = useState(null);
+  const onEdgeInsert = useCallback((edgeId, flowX, flowY) => {
+    // flowX/flowY are already in flow coordinates (PathStatsEdge passes labelX/labelY).
+    // Convert to screen coordinates for popover positioning.
+    const vp = rf.getViewport();
+    const screenX = flowX * vp.zoom + vp.x;
+    const screenY = flowY * vp.zoom + vp.y;
+    const rect = wrapperRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setInsertPicker({
+      edgeId,
+      screenX: rect.left + screenX,
+      screenY: rect.top + screenY,
+      worldX: flowX,
+      worldY: flowY,
+    });
+  }, [rf]);
+
+  const insertLogicNode = useCallback((kind) => {
+    if (!insertPicker) return;
+    const { edgeId, worldX, worldY } = insertPicker;
+    setEdges((currEdges) => {
+      const orig = currEdges.find((e) => e.id === edgeId);
+      if (!orig) return currEdges;
+      const id = 'logic-' + Date.now();
+      const w = NODE_W.logic, h = NODE_H.logic;
+      const newNode = {
+        id,
+        type: 'logic',
+        position: { x: worldX - w / 2, y: worldY - h / 2 },
+        data: {
+          kind,
+          title: kind === 'condition' ? 'Untitled condition' : 'Untitled A/B test',
+        },
+      };
+      const k = LOGIC_KIND[kind] || LOGIC_KIND.condition;
+      const inEdge = {
+        id: `e-${orig.source}-${id}-${Date.now()}`,
+        source: orig.source,
+        target: id,
+        type: 'pathStats',
+        sourceHandle: orig.sourceHandle,
+        data: { volume: orig.data?.volume || 0, branch: orig.data?.branch || null, label: orig.data?.label || null },
+      };
+      const outEdge = {
+        id: `e-${id}-${orig.target}-${Date.now() + 1}`,
+        source: id,
+        target: orig.target,
+        type: 'pathStats',
+        sourceHandle: k.primaryBranch,
+        data: { volume: orig.data?.volume || 0, branch: k.primaryBranch, label: null },
+      };
+      // splice: replace orig with [inEdge, outEdge]
+      const idx = currEdges.findIndex((e) => e.id === edgeId);
+      const next = [...currEdges];
+      next.splice(idx, 1, inEdge, outEdge);
+      // also push the new node — do this in a nested setNodes (split here so
+      // both transitions land in one effect cycle)
+      setNodes((ns) => [...ns, newNode]);
+      return next;
+    });
+    setSelectedNodeId(null);
+    setInsertPicker(null);
+  }, [insertPicker, setEdges, setNodes]);
+
   const changeSource = useCallback((nodeId, newSrcId) => {
     setNodes((ns) =>
       ns.map((n) =>
@@ -175,11 +258,21 @@ function CanvasInner({
     });
   }, [nodes, mode, sourceTargets, outgoingCounts, removeNodeById, changeSource]);
 
-  // Thread mode into edge.data so PathStatsEdge can switch its rendering
-  // (mid-edge stat pill is Analyse-only).
+  // Thread mode + callbacks into edge.data so PathStatsEdge can switch its
+  // rendering (mid-edge stat pill is Analyse-only) and so the hover chip
+  // can call back to remove the edge or open the insert picker.
   const decoratedEdges = useMemo(
-    () => edges.map((e) => ({ ...e, data: { ...(e.data || {}), _mode: mode } })),
-    [edges, mode],
+    () =>
+      edges.map((e) => ({
+        ...e,
+        data: {
+          ...(e.data || {}),
+          _mode: mode,
+          _onRemove: removeEdgeById,
+          _onInsert: onEdgeInsert,
+        },
+      })),
+    [edges, mode, removeEdgeById, onEdgeInsert],
   );
 
   // ───────────────────────── Selection ─────────────────────────
@@ -345,6 +438,27 @@ function CanvasInner({
     };
   }, [canvasApiRef, nodes, edges, mode, rf, setNodes, setEdges, removeNodeById]);
 
+  // ───────────────────────── Drop-target highlighting ─────────────────────────
+  // While the user drags from a source handle, xyflow fires onConnectStart.
+  // We track a "connecting" flag + the candidate target node id so we can
+  // pulse a brand-coloured ring on it. Sources can't receive connections —
+  // isValidConnection enforces that and the ring won't draw on a source.
+  const [connectFromId, setConnectFromId] = useState(null);
+  const onConnectStart = useCallback((_, { nodeId }) => {
+    setConnectFromId(nodeId);
+  }, []);
+  const onConnectEnd = useCallback(() => {
+    setConnectFromId(null);
+  }, []);
+  const isValidConnection = useCallback((c) => {
+    // No self-loops, no same-pair dupes, no targeting a source node.
+    if (c.source === c.target) return false;
+    const targetNode = nodes.find((n) => n.id === c.target);
+    if (targetNode?.type === 'source') return false;
+    if (edges.some((e) => e.source === c.source && e.target === c.target)) return false;
+    return true;
+  }, [nodes, edges]);
+
   // ───────────────────────── Connections ─────────────────────────
   // When user drags from a handle to another node's target handle, xyflow
   // calls onConnect with { source, target, sourceHandle, targetHandle }.
@@ -495,8 +609,15 @@ function CanvasInner({
   const onZoomOut = () => rf.zoomOut();
   const onSetZoom = (next) => rf.zoomTo(next);
   const onAutoLayout = () => {
-    // Placeholder for Session C — for now, just fit-to-view as a fallback.
-    rf.fitView({ padding: 0.18, duration: 320 });
+    if (!nodes.length) return;
+    const sizeFor = (n) => ({
+      width: NODE_W[n.type] || n.width || 240,
+      height: getNodeH({ type: n.type, data: n.data }, mode),
+    });
+    const laidOut = dagreLayout(nodes, edges, { sizeFor, hGap: 130, vGap: 60 });
+    setNodes(laidOut);
+    // fit-to-view after the layout settles so the user sees the result framed
+    setTimeout(() => rf.fitView({ padding: 0.18, duration: 320 }), 50);
   };
   const [zoomDisplay, setZoomDisplay] = useState(1);
   useEffect(() => {
@@ -555,6 +676,9 @@ function CanvasInner({
           onNodesChange={onNodesChangeXY}
           onEdgesChange={onEdgesChangeXY}
           onConnect={onConnect}
+          onConnectStart={onConnectStart}
+          onConnectEnd={onConnectEnd}
+          isValidConnection={isValidConnection}
           onSelectionChange={handleSelectionChange}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
@@ -570,6 +694,7 @@ function CanvasInner({
           deleteKeyCode={['Backspace', 'Delete']}
           proOptions={{ hideAttribution: true }}
           style={{ background: 'transparent' }}
+          className={connectFromId ? 'is-connecting' : ''}
         />
       )}
 
@@ -584,6 +709,58 @@ function CanvasInner({
           onSetZoom={onSetZoom}
         />
       )}
+
+      {/* insert-step picker — opens at edge midpoint when user clicks the +
+         hover chip on an edge. Same UX as the old Canvas. */}
+      {insertPicker &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[9990]"
+            onClick={() => setInsertPicker(null)}
+          >
+            <div
+              className="absolute bg-white rounded-lg shadow-menu border border-line p-1"
+              style={{
+                left: insertPicker.screenX,
+                top: insertPicker.screenY,
+                transform: 'translate(-50%, 8px)',
+                minWidth: 180,
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-ink-soft">
+                Insert step here
+              </div>
+              <MenuItem
+                icon={<FileIcon size={13} />}
+                label="Page"
+                onClick={() => setInsertPicker(null)}
+              />
+              <MenuItem
+                icon={<Cart size={13} />}
+                label="Checkout"
+                onClick={() => setInsertPicker(null)}
+              />
+              <MenuItem
+                icon={<TrendUp size={13} />}
+                label="Upsell"
+                onClick={() => setInsertPicker(null)}
+              />
+              <MenuDivider />
+              <MenuItem
+                icon={<Workflow size={13} />}
+                label="Condition"
+                onClick={() => insertLogicNode('condition')}
+              />
+              <MenuItem
+                icon={<Bars size={13} />}
+                label="A/B test"
+                onClick={() => insertLogicNode('abtest')}
+              />
+            </div>
+          </div>,
+          document.body,
+        )}
     </main>
   );
 }

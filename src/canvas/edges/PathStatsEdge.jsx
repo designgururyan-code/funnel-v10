@@ -15,6 +15,37 @@ import {
   X,
 } from '../../App.jsx';
 
+const Plus = ({ size = 11 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <line x1="12" y1="5" x2="12" y2="19" />
+    <line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+);
+const Xicon = ({ size = 11 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <line x1="18" y1="6" x2="6" y2="18" />
+    <line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+);
+
 /**
  * PathStatsEdge — xyflow custom edge.
  *
@@ -78,6 +109,21 @@ export default function PathStatsEdge({
   const vol = data?.volume || 0;
   const labelStr = (data?.label || '').trim();
   const hasLabel = labelStr.length > 1;
+  const buildHover = mode === 'build' && hovered;
+  const onInsert = data?._onInsert;
+  const onRemove = data?._onRemove;
+
+  // arrow tip orientation — tangent of the smoothstep approaching the target
+  // (smoothstep ends are orthogonal to the target side, so we can derive it
+  // from sourcePosition/targetPosition; for Right→Left the arrow points east).
+  const arrowAngle =
+    targetPosition === 'left'
+      ? 0
+      : targetPosition === 'right'
+      ? Math.PI
+      : targetPosition === 'top'
+      ? Math.PI / 2
+      : -Math.PI / 2;
 
   // Compute conversion rate using the source node's visitor count
   // (sources expose visitorsNum, pages expose visitors).
@@ -130,6 +176,15 @@ export default function PathStatsEdge({
           ...style,
         }}
       />
+
+      {/* arrow tip at destination — drawn as inline SVG via foreignObject so it
+         stays above any node it might overlap. */}
+      <g
+        transform={`translate(${targetX}, ${targetY}) rotate(${(arrowAngle * 180) / Math.PI})`}
+        style={{ pointerEvents: 'none' }}
+      >
+        <polygon points="-7,-4 0,0 -7,4" fill={stroke} style={{ transition: 'fill 140ms ease' }} />
+      </g>
 
       {/* branch badge near destination */}
       {meta && (
@@ -286,6 +341,53 @@ export default function PathStatsEdge({
                 </span>
               </span>
             </button>
+          </div>
+        </EdgeLabelRenderer>
+      )}
+
+      {/* hover insert/remove chip — Build mode only */}
+      {buildHover && (
+        <EdgeLabelRenderer>
+          <div
+            className="nodrag nopan"
+            style={{
+              position: 'absolute',
+              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+              pointerEvents: 'all',
+              zIndex: 7,
+            }}
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => setHovered(false)}
+          >
+            <div
+              className="inline-flex items-center bg-white rounded-md border border-line"
+              style={{
+                boxShadow: '0 1px 3px rgba(15,23,42,0.10)',
+                height: 24,
+              }}
+            >
+              <button
+                title="Insert step"
+                onClick={(ev) => {
+                  ev.stopPropagation();
+                  onInsert && onInsert(id, labelX, labelY);
+                }}
+                className="w-6 h-6 inline-flex items-center justify-center text-ink-muted hover:text-ink hover:bg-surface-sub transition-colors rounded-l-md"
+              >
+                <Plus size={11} />
+              </button>
+              <span className="w-px h-4 bg-line-soft" />
+              <button
+                title="Remove connection"
+                onClick={(ev) => {
+                  ev.stopPropagation();
+                  onRemove && onRemove(id);
+                }}
+                className="w-6 h-6 inline-flex items-center justify-center text-ink-muted hover:text-bad-deep hover:bg-bad-soft transition-colors rounded-r-md"
+              >
+                <Xicon size={11} />
+              </button>
+            </div>
           </div>
         </EdgeLabelRenderer>
       )}
