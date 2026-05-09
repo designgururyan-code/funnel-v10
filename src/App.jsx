@@ -363,10 +363,11 @@ function TopbarWired({ project, onProjectChange, mode, onModeChange }) {
         <Tip label="Redo  ⇧⌘Z" side="bottom"><button className="w-8 h-8 inline-flex items-center justify-center rounded-md border border-line text-ink-muted hover:bg-surface-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed" disabled><Redo size={15}/></button></Tip>
         <span className="w-px h-5 bg-line mx-0.5"/>
         <Tip label="Notifications" side="bottom"><button className="w-8 h-8 inline-flex items-center justify-center rounded-md border border-line text-ink-muted hover:bg-surface-muted transition-colors"><Bell size={15}/></button></Tip>
-        <Tip label="Refresh" side="bottom"><button className="w-8 h-8 inline-flex items-center justify-center rounded-md border border-line text-ink-muted hover:bg-surface-muted transition-colors"><Refresh size={15}/></button></Tip>
-        <Tip label="Settings" side="bottom"><button className="w-8 h-8 inline-flex items-center justify-center rounded-md border border-line text-ink-muted hover:bg-surface-muted transition-colors"><Cog size={15}/></button></Tip>
+        <Tip label="Refresh data" side="bottom"><button className="w-8 h-8 inline-flex items-center justify-center rounded-md border border-line text-ink-muted hover:bg-surface-muted transition-colors"><Refresh size={15}/></button></Tip>
+        <Tip label="Account settings" side="bottom"><button className="w-8 h-8 inline-flex items-center justify-center rounded-md border border-line text-ink-muted hover:bg-surface-muted transition-colors"><Cog size={15}/></button></Tip>
         <span className="w-px h-5 bg-line mx-0.5"/>
-        <button className="inline-flex items-center gap-1.5 h-[35px] px-3.5 bg-genesis hover:bg-genesis-hover text-white text-[12.5px] font-semibold rounded-lg shadow-publish transition-colors">
+        <button onClick={() => window.dispatchEvent(new CustomEvent('open-pre-publish'))}
+          className="inline-flex items-center gap-1.5 h-[35px] px-3.5 bg-genesis hover:bg-genesis-hover text-white text-[12.5px] font-semibold rounded-lg shadow-publish transition-colors">
           <Globe size={15}/> Publish
         </button>
         <button className="flex items-center gap-1.5 pl-1 pr-2 py-0.5 rounded-full border border-line hover:bg-surface-sub transition-colors">
@@ -1200,7 +1201,7 @@ function Sidebar({ onAIClick, onBuildAIClick, collapsed, onToggleCollapsed, focu
           </span>
           <div className="flex-1 text-left">
             <div className="text-[12.5px] font-semibold text-ink leading-none">Build with AI</div>
-            <div className="text-[10.5px] text-violet/70 mt-0.5">Describe your funnel, AI builds it</div>
+            <div className="text-[10.5px] text-violet/70 mt-0.5">Describe it. AI builds it.</div>
           </div>
           <ChevronRight size={11} className="text-violet"/>
         </button>
@@ -1211,7 +1212,7 @@ function Sidebar({ onAIClick, onBuildAIClick, collapsed, onToggleCollapsed, focu
           </span>
           <div className="flex-1 text-left">
             <div className="text-[12.5px] font-semibold text-ink leading-none">AI suggestions</div>
-            <div className="text-[10.5px] text-ink-soft mt-0.5">3 smart tips for this funnel</div>
+            <div className="text-[10.5px] text-ink-soft mt-0.5">3 ways to lift conversion</div>
           </div>
           <span className="inline-flex items-center justify-center min-w-[20px] h-[18px] px-1 rounded-full bg-violet text-white text-[10px] font-bold tabular-nums">3</span>
         </button>
@@ -1416,7 +1417,7 @@ function AIPopover({ open, onClose }) {
           <span className="w-7 h-7 rounded-md bg-violet-soft text-violet flex items-center justify-center"><Spark size={14}/></span>
           <div className="flex-1">
             <div className="text-[13px] font-semibold text-ink leading-tight">AI suggestions</div>
-            <div className="text-[10.5px] text-ink-soft mt-0.5">3 smart tips for this funnel</div>
+            <div className="text-[10.5px] text-ink-soft mt-0.5">3 ways to lift conversion</div>
           </div>
           <button onClick={onClose} className="w-6 h-6 inline-flex items-center justify-center rounded hover:bg-surface-sub text-ink-soft transition-colors"><X size={13}/></button>
         </div>
@@ -1447,7 +1448,7 @@ function EmptyCanvas({ onJumpToTemplates, onJumpToPages }) {
           <div className="text-[11px] font-semibold uppercase tracking-wider text-ink-soft">Get started</div>
           <h2 className="text-[22px] font-semibold text-ink mt-1.5">Build your funnel in 3 steps</h2>
           <p className="text-[13px] text-ink-soft mt-2 max-w-[460px] mx-auto leading-relaxed">
-            Add a traffic source, drop in your first page, and connect them. You can always start from a template instead.
+            Add a traffic source, then your first page, then connect them. Or start from a template.
           </p>
         </div>
 
@@ -4302,7 +4303,7 @@ function InspectorSettings({ node, api }) {
               ))}
             </select>
             <p className="text-[10.5px] text-ink-soft leading-snug mt-1">
-              Swap this template placeholder with a real page from your project.
+              Swap the template placeholder for a real page from your project.
             </p>
           </Field>
         )}
@@ -4371,7 +4372,7 @@ function InspectorSettings({ node, api }) {
             </div>
           </Field>
           <p className="text-[10.5px] text-ink-soft leading-snug">
-            Used for funnel-wide revenue, AOV, and ROI calculations. Multiple line items / order bumps coming soon.
+            Drives funnel-wide revenue, AOV, and ROI. Multi-line carts coming soon.
           </p>
         </InspSection>
       )}
@@ -4704,7 +4705,7 @@ function InspectorEmpty({ funnel, canvasNodes = [], mode = "build" }) {
     { color: '#1877F2', icon: <Globe    size={11}/>, text: <><span className="font-medium">Facebook</span> source connected</>,                                  time: '1h ago' },
     { color: '#7C3AED', icon: <Sparkles size={11}/>, text: <>Suggestion: <span className="font-medium">A/B test the headline</span></>,                          time: '3h ago' },
     { color: '#006CB5', icon: <FileIcon size={11}/>, text: <>Landing page edited</>,                                                                             time: '1d ago' },
-    { color: '#F59E0B', icon: <Edit     size={11}/>, text: <>Renamed step from <span className="font-medium">Step 2</span> to <span className="font-medium">Lead Magnet</span></>, time: '2d ago' },
+    { color: '#F59E0B', icon: <Edit     size={11}/>, text: <>Renamed <span className="font-medium">Step 2</span> → <span className="font-medium">Lead Magnet</span></>, time: '2d ago' },
     { color: '#10B981', icon: <Plus     size={11}/>, text: <>Added <span className="font-medium">Welcome email</span> to sequence</>,                            time: '3d ago' },
   ];
   return (
@@ -4733,7 +4734,7 @@ function InspectorEmpty({ funnel, canvasNodes = [], mode = "build" }) {
             </button>
             <button onClick={() => canShowAdvanced && setView('advanced')}
               disabled={!canShowAdvanced}
-              title={canShowAdvanced ? '' : 'Add pricing to a checkout, or cost to a paid source, to enable Advanced.'}
+              title={canShowAdvanced ? '' : 'Add pricing to a checkout (or cost to a paid source) to unlock Advanced.'}
               className={`h-5 px-1.5 text-[10.5px] font-medium rounded transition-colors ${
                 view === 'advanced' ? 'bg-white text-ink shadow-xs'
                 : canShowAdvanced ? 'text-ink-soft hover:text-ink'
@@ -5592,6 +5593,76 @@ function FunnelGraph({ canvasNodes }) {
 }
 
 
+
+/* PrePublishModal — opens when user clicks Publish in the topbar.
+   Shows a quick checklist computed from canvas state:
+   pages connected · thank-you exists · tracking · checkout priced · mobile
+   reviewed. Each item is green/red with a ✓ or × icon. User can either
+   "Fix issues" (close + return to canvas) or "Publish anyway". */
+function PrePublishModal({ open, canvasNodes, onClose, onPublish }) {
+  if (!open) return null;
+  const pages = canvasNodes.filter(n => n.type === 'page');
+  const sources = canvasNodes.filter(n => n.type === 'source');
+  // Approximate "all connected" — in this demo we lack edges in App scope, so
+  // just check pages > 0 + sources > 0 (real impl would inspect edges).
+  const hasFlow      = pages.length >= 1 && sources.length >= 1;
+  const hasThanks    = pages.some(p => p.data.pageType === 'thanks');
+  const hasTracking  = sources.length >= 1;
+  const hasCheckout  = pages.some(p => p.data.pageType === 'checkout');
+  const checkoutPriced = !hasCheckout || pages.some(p => p.data.pageType === 'checkout' && typeof p.data.price === 'number' && p.data.price > 0);
+  const checks = [
+    { ok: hasFlow,        label: 'Pages and sources connected' },
+    { ok: hasThanks,      label: 'Thank-you page exists' },
+    { ok: hasTracking,    label: 'At least one traffic source' },
+    { ok: checkoutPriced, label: hasCheckout ? 'Checkout has a price set' : 'No checkout in this funnel — skipped', soft: !hasCheckout },
+    { ok: false,          label: 'Mobile preview reviewed', soft: true },
+  ];
+  const blockers = checks.filter(c => !c.ok && !c.soft).length;
+  return (
+    <div className="fixed inset-0 z-[9985] flex items-center justify-center modal-backdrop"
+         style={{ background: 'rgba(15,23,42,0.45)' }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()}
+        className="modal-card w-[480px] max-w-[92vw] bg-white rounded-xl shadow-modal overflow-hidden">
+        <div className="px-5 pt-4 pb-3 border-b border-line-soft flex items-center justify-between">
+          <div>
+            <h3 className="text-[15px] font-semibold text-ink">Ready to publish?</h3>
+            <p className="text-[11.5px] text-ink-soft mt-0.5">Quick check before your funnel goes live.</p>
+          </div>
+          <button onClick={onClose} className="text-ink-soft hover:text-ink transition-colors"><X size={14}/></button>
+        </div>
+        <div className="px-5 py-4 space-y-2.5">
+          {checks.map((c, i) => (
+            <div key={i} className="flex items-center gap-2.5">
+              <span className={`w-5 h-5 rounded-full inline-flex items-center justify-center shrink-0 ${
+                c.ok ? 'bg-good-soft text-good-deep' : c.soft ? 'bg-warn-soft text-warn-deep' : 'bg-bad-soft text-bad-deep'
+              }`}>
+                {c.ok ? <Check size={11}/> : c.soft ? <Activity size={11}/> : <X size={11}/>}
+              </span>
+              <span className={`text-[12.5px] ${c.ok ? 'text-ink' : c.soft ? 'text-ink-muted' : 'text-ink'}`}>{c.label}</span>
+            </div>
+          ))}
+        </div>
+        <div className="px-5 py-3 bg-surface-sub border-t border-line-soft flex items-center justify-between">
+          <span className="text-[10.5px] text-ink-soft">
+            {blockers > 0 ? `${blockers} item${blockers === 1 ? '' : 's'} need attention.` : 'All set — you\'re good to go.'}
+          </span>
+          <div className="flex items-center gap-2">
+            <button onClick={onClose}
+              className="h-8 px-3 inline-flex items-center text-[12px] font-medium text-ink-muted bg-white border border-line rounded-md hover:bg-surface-muted hover:text-ink transition-colors">
+              Fix issues
+            </button>
+            <button onClick={onPublish}
+              className="h-8 px-3.5 inline-flex items-center gap-1.5 text-[12px] font-semibold text-white bg-genesis hover:bg-genesis-hover rounded-md transition-colors">
+              <Globe size={12}/> {blockers > 0 ? 'Publish anyway' : 'Publish'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 export default function App() {
   const [aiOpen, setAiOpen] = useState(false);
   const [aiChatOpen, setAiChatOpen] = useState(false); // Build with AI sidebar mode
@@ -5644,6 +5715,11 @@ export default function App() {
     window.addEventListener('sidebar-add-source', handler);
     return () => window.removeEventListener('sidebar-add-source', handler);
   }, []);
+  useEffect(() => {
+    const handler = () => setPrePublishOpen(true);
+    window.addEventListener('open-pre-publish', handler);
+    return () => window.removeEventListener('open-pre-publish', handler);
+  }, []);
   const [project, setProject] = useState(PROJECTS[0]);
   const [funnel, setFunnel] = useState(FUNNELS[0]);
   const [mode, setMode] = useState('build');
@@ -5652,6 +5728,7 @@ export default function App() {
   const [selectedNode, setSelectedNode] = useState(null);
   const [canvasNodes, setCanvasNodes] = useState([]);
   const [newFunnelOpen, setNewFunnelOpen] = useState(false);
+  const [prePublishOpen, setPrePublishOpen] = useState(false);
   /* ref-based imperative API exposed by Canvas for the Inspector to call (rename,
      remove, duplicate, deselect). Canvas owns nodes/edges; Inspector mutates
      through this so there's a single source of truth. */
@@ -5692,6 +5769,9 @@ export default function App() {
       <TemplateModal template={templateModal} onClose={() => setTemplateModal(null)} onConfirm={() => {}}/>
       <OptimiseSuggestionModal open={!!suggestion} nodeTitle={suggestion?.title} onClose={() => setSuggestion(null)}/>
       {newFunnelOpen && <NewFunnelStarter onClose={() => setNewFunnelOpen(false)} onPickTemplate={(t) => { setTemplateModal(t); setNewFunnelOpen(false); }} onScratch={() => setNewFunnelOpen(false)}/>}
+      <PrePublishModal open={prePublishOpen} canvasNodes={canvasNodes}
+        onClose={() => setPrePublishOpen(false)}
+        onPublish={() => { setPrePublishOpen(false); /* real publish would happen here */ }}/>
       <ToastViewport toast={toast}/>
     </div>
     </ToastContext.Provider>
