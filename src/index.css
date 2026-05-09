@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "@xyflow/react/dist/style.css";
 
 /* =====================================================================
    Funnel Builder v10 — Theme tokens
@@ -188,6 +189,60 @@ body {
    ===================================================================== */
 
 .react-flow__background { background: var(--color-surface-cool); }
+
+/* xyflow renders pane background — we draw our own dot grid in Canvas.jsx,
+   so let xyflow's pane stay transparent. */
+.react-flow,
+.react-flow__renderer,
+.react-flow__pane { background: transparent !important; }
+
+/* Hide xyflow's default attribution chip + any built-in chrome. */
+.react-flow__attribution { display: none !important; }
+
+/* BrandedHandle — match the look of the old hand-coded ConnectorDot.
+   Default: invisible until parent .group/node hovers (inherits from the
+   inline opacity:0 default via the React component's hover wrapper).
+   Explicit always-visible variant keeps the dot opaque. */
+.react-flow__handle.branded-handle {
+  opacity: 0;
+}
+.react-flow__node:hover .react-flow__handle.branded-handle,
+.react-flow__node-page:hover .react-flow__handle.branded-handle,
+.react-flow__node-source:hover .react-flow__handle.branded-handle,
+.react-flow__node-logic:hover .react-flow__handle.branded-handle {
+  opacity: 1;
+}
+.react-flow__handle.branded-handle.branded-handle--visible {
+  opacity: 1;
+}
+.react-flow__handle.branded-handle:hover {
+  transform: translate(-50%, -50%) scale(1.4);
+}
+.react-flow__handle-right.branded-handle:hover {
+  transform: translate(50%, -50%) scale(1.4);
+}
+.react-flow__handle-bottom.branded-handle:hover {
+  transform: translate(-50%, 50%) scale(1.4);
+}
+.react-flow__handle-top.branded-handle:hover {
+  transform: translate(-50%, -50%) scale(1.4);
+}
+
+/* xyflow wraps each node in a .react-flow__node element. Our cards already
+   have all the visual chrome — drop xyflow's selection ring + default
+   border so visual parity stays exact. */
+.react-flow__node {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+}
+.react-flow__node.selected {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
 .react-flow__controls {
   box-shadow: var(--shadow-card);
   border: 1px solid var(--color-line);
