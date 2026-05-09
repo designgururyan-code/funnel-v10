@@ -3515,7 +3515,6 @@ function Canvas({ mode, demoState, onDemoStateChange, onJumpToTemplates, onJumpT
                                                  target={sourceTargets[n.id]}/>
               );
             })}
-          )}
 
           {/* edges UI overlay — arrow + chip + stats. Renders ABOVE nodes so neither
               the chip nor the arrow tip is occluded when an endpoint sits behind a card. */}
