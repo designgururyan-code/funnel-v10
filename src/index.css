@@ -206,7 +206,8 @@ body {
    if you click/drag/grab/type at this element.
    ===================================================================== */
 
-/* Pointer for anything that triggers an action on click. */
+/* Pointer for anything that triggers an action on click.
+   !important wins against Tailwind's preflight + any utility class race. */
 button:not(:disabled),
 [role="button"]:not(:disabled),
 a,
@@ -214,12 +215,12 @@ label[for],
 summary,
 select,
 [data-clickable="true"] {
-  cursor: pointer;
+  cursor: pointer !important;
 }
 
 button:disabled,
 [aria-disabled="true"] {
-  cursor: not-allowed;
+  cursor: not-allowed !important;
 }
 
 /* Text cursor for typeable inputs (browsers usually do this, but explicit
@@ -279,4 +280,49 @@ input[type="range"] {
 .no-select * {
   user-select: none;
   -webkit-user-select: none;
+}
+
+/* =====================================================================
+   AB test split slider (.ab-slider) — slim track + custom thumb.
+   Track 4px tall; thumb 14px circle with brand-soft halo.
+   ===================================================================== */
+
+.ab-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 9999px;
+}
+
+.ab-slider:focus { outline: none; }
+
+.ab-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: white;
+  border: 2px solid #7C3AED;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.18);
+  cursor: ew-resize;
+  margin-top: 0;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.ab-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 0 0 6px rgba(124, 58, 237, 0.16), 0 1px 3px rgba(15, 23, 42, 0.2);
+}
+.ab-slider::-webkit-slider-thumb:active {
+  transform: scale(1.2);
+}
+
+.ab-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: white;
+  border: 2px solid #7C3AED;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.18);
+  cursor: ew-resize;
 }

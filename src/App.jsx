@@ -14,7 +14,7 @@
  * src/components/. Until then, this monolith works fine — Vite handles
  * 3000-line files without complaint and hot-reload is fast.
  */
-import { useState, useMemo, useEffect, useRef, useLayoutEffect, Fragment } from 'react'
+import React, { useState, useMemo, useEffect, useRef, useLayoutEffect, Fragment } from 'react'
 import { createPortal } from 'react-dom'
 
 const I = (children) => ({ size = 14, sw = 1.75, className = '', style } = {}) => (
@@ -88,6 +88,8 @@ const Image        = I(<><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/
 const HomeIcon     = I(<><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></>);
 const PlayIcon     = I(<polygon points="5 3 19 12 5 21 5 3"/>);
 const GiftIcon     = I(<><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></>);
+const Activity     = I(<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>);
+const Download     = I(<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></>);
 const FacebookIcon = ({size=14}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M22 12c0-5.52-4.48-10-10-10S2 6.48 2 12c0 4.84 3.44 8.87 8 9.8V15H8v-3h2V9.5C10 7.57 11.57 6 13.5 6H16v3h-2c-.55 0-1 .45-1 1v2h3v3h-3v6.95c5.05-.5 9-4.76 9-9.95z"/></svg>;
 const YoutubeIcon  = ({size=14}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1c.5-1.9.5-5.8.5-5.8s0-3.9-.5-5.8zM9.5 15.6V8.4L15.8 12l-6.3 3.6z"/></svg>;
 const InstaIcon    = I(<><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><circle cx="17.5" cy="6.5" r=".5" fill="currentColor"/></>);
@@ -363,6 +365,7 @@ function TopbarWired({ project, onProjectChange, mode, onModeChange }) {
 }
 
 function ContextBar({ funnel, onFunnelChange, mode }) {
+  const showToast = useToast();
   const [funOpen, setFunOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
   const [kebabOpen, setKebabOpen] = useState(false);
@@ -395,7 +398,7 @@ function ContextBar({ funnel, onFunnelChange, mode }) {
               onClick={() => { onFunnelChange(f); setFunOpen(false); }}/>
           ))}
           <MenuDivider/>
-          <MenuItem icon={<Plus size={13}/>} label="New funnel" onClick={() => setFunOpen(false)}/>
+          <MenuItem icon={<Plus size={13}/>} label="New funnel" onClick={() => { setFunOpen(false); window.dispatchEvent(new CustomEvent('open-new-funnel')); }}/>
         </Popover>
 
         {/* Status chip — flex items-center forces vertical centering relative to the funnel button */}
@@ -446,7 +449,7 @@ function ContextBar({ funnel, onFunnelChange, mode }) {
         <Popover anchorRef={kebabAnchor} open={kebabOpen} onClose={() => setKebabOpen(false)} width={200} align="end">
           <MenuItem icon={<Edit         size={13}/>} label="Rename funnel"     onClick={() => { setKebabOpen(false); setFunnelAction('rename'); }}/>
           <MenuItem icon={<Copy         size={13}/>} label="Duplicate funnel"  onClick={() => { setKebabOpen(false); setFunnelAction('duplicate'); }}/>
-          <MenuItem icon={<ExternalLink size={13}/>} label="Copy live URL"     onClick={() => { setKebabOpen(false); navigator.clipboard?.writeText(`${funnel.name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')}.estage.com`); }}/>
+          <MenuItem icon={<ExternalLink size={13}/>} label="Copy live URL"     onClick={() => { setKebabOpen(false); const u = `${funnel.name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')}.estage.com`; navigator.clipboard?.writeText(u); showToast('Copied to clipboard'); }}/>
           <MenuDivider/>
           <MenuItem icon={<Cog          size={13}/>} label="Funnel settings"   onClick={() => { setKebabOpen(false); setFunnelAction('settings'); }}/>
           <MenuDivider/>
@@ -485,7 +488,7 @@ function FunnelActionModal({ action, funnel, onClose, onConfirm }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center modal-backdrop" style={{ background: 'rgba(15,23,42,0.45)' }} onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()}
-        className="modal-card w-[440px] max-w-[92vw] bg-white rounded-xl shadow-modal border border-line overflow-hidden">
+        className={`modal-card max-w-[92vw] bg-white rounded-xl shadow-modal border border-line overflow-hidden ${isSettings ? 'w-[560px]' : 'w-[440px]'}`}>
         <div className="px-5 pt-4 pb-3 flex items-center justify-between border-b border-line-soft">
           <div className="flex items-center gap-2">
             {isDelete && <span className="w-7 h-7 rounded-md bg-bad-soft text-bad-deep inline-flex items-center justify-center"><Trash size={14}/></span>}
@@ -518,22 +521,7 @@ function FunnelActionModal({ action, funnel, onClose, onConfirm }) {
               <p className="text-[11.5px] text-ink-soft mt-2 leading-snug">This will permanently remove the funnel, its pages, and all associated analytics. This action cannot be undone.</p>
             </div>
           )}
-          {isSettings && (
-            <div className="space-y-3">
-              <Field label="Tracking">
-                <Toggle label="Track conversions" defaultOn/>
-                <Toggle label="Send to analytics" defaultOn/>
-              </Field>
-              <Field label="Visibility">
-                <Toggle label="Indexable in search" />
-                <Toggle label="Public preview link" defaultOn/>
-              </Field>
-              <Field label="Domain">
-                <input defaultValue={`${funnel.name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')}.estage.com`}
-                  className="w-full h-8 px-2.5 text-[12px] text-ink bg-surface-sub border border-line-soft rounded-md outline-none focus:border-brand font-mono"/>
-              </Field>
-            </div>
-          )}
+          {isSettings && <FunnelSettingsTabs funnel={funnel}/>}
         </div>
         <div className="px-5 py-3 bg-surface-sub border-t border-line-soft flex items-center justify-end gap-2">
           <button onClick={onClose}
@@ -690,6 +678,192 @@ const DEMO_STATES = {
 
 const DEMO_STATE_ORDER = ['empty','leadMagnet','webinar','tripwire','sales'];
 
+
+/* FunnelSettingsTabs — tabbed settings panel (inside FunnelActionModal).
+   General / Tracking / Integrations / Notifications / Privacy / Danger. */
+function FunnelSettingsTabs({ funnel }) {
+  const [tab, setTab] = useState('general');
+  const tabs = [
+    { id: 'general',       label: 'General'       },
+    { id: 'tracking',      label: 'Tracking'      },
+    { id: 'integrations',  label: 'Integrations'  },
+    { id: 'notifications', label: 'Notifications' },
+    { id: 'privacy',       label: 'Privacy'       },
+    { id: 'danger',        label: 'Danger'        },
+  ];
+  return (
+    <div className="-mx-5 -my-4">
+      {/* Tab strip */}
+      <div className="flex items-stretch px-3 border-b border-line-soft overflow-x-auto scroll-thin">
+        {tabs.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            className={`shrink-0 px-3 py-2.5 text-[12px] font-medium transition-colors whitespace-nowrap
+                        ${tab === t.id ? 'text-ink' : 'text-ink-soft hover:text-ink-muted'}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab content */}
+      <div className="px-5 py-4 max-h-[440px] overflow-y-auto scroll-thin">
+        {tab === 'general' && (
+          <div className="space-y-3">
+            <Field label="Funnel name">
+              <input defaultValue={funnel.name}
+                className="w-full h-8 px-2.5 text-[12.5px] text-ink bg-surface-sub border border-line-soft rounded-md outline-none focus:border-brand"/>
+            </Field>
+            <Field label="URL slug">
+              <div className="flex items-center gap-1">
+                <span className="text-[11px] text-ink-soft">/</span>
+                <input defaultValue={funnel.name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')}
+                  className="flex-1 h-8 px-2.5 text-[12.5px] text-ink bg-surface-sub border border-line-soft rounded-md outline-none focus:border-brand font-mono"/>
+              </div>
+            </Field>
+            <Field label="Custom domain">
+              <input defaultValue={`${funnel.name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')}.estage.com`}
+                className="w-full h-8 px-2.5 text-[12px] text-ink bg-surface-sub border border-line-soft rounded-md outline-none focus:border-brand font-mono"/>
+            </Field>
+            <Field label="Description">
+              <textarea defaultValue="" placeholder="Optional internal description for this funnel."
+                className="w-full h-16 px-2.5 py-1.5 text-[12px] text-ink bg-surface-sub border border-line-soft rounded-md outline-none focus:border-brand resize-none"/>
+            </Field>
+          </div>
+        )}
+
+        {tab === 'tracking' && (
+          <div className="space-y-3">
+            <Field label="Analytics" gap="loose">
+              <ConnectRow Icon={Activity}     name="Google Analytics"  status="connected"    color="#F59E0B"/>
+              <ConnectRow Icon={Activity}     name="Meta Pixel"        status="connected"    color="#1877F2"/>
+              <ConnectRow Icon={Activity}     name="TikTok Pixel"      status="not-connected" color="#000000"/>
+              <ConnectRow Icon={Activity}     name="Custom JS / Tag Manager" status="not-connected" color="#475569"/>
+            </Field>
+            <Field label="Behavior" gap="loose">
+              <Toggle label="Track conversions" defaultOn/>
+              <Toggle label="Track scroll depth" defaultOn/>
+              <Toggle label="Track form abandonment" />
+              <Toggle label="Mask PII in events" defaultOn/>
+            </Field>
+          </div>
+        )}
+
+        {tab === 'integrations' && (
+          <div className="space-y-3">
+            <Field label="Traffic sources" gap="loose">
+              <ConnectRow Icon={Globe}     name="Facebook Ads"  status="connected"    color="#1877F2"/>
+              <ConnectRow Icon={Globe}     name="Google Ads"    status="connected"    color="#EA4335"/>
+              <ConnectRow Icon={Globe}     name="YouTube"       status="not-connected" color="#FF0000"/>
+              <ConnectRow Icon={Globe}     name="TikTok Ads"    status="not-connected" color="#000000"/>
+              <ConnectRow Icon={Globe}     name="LinkedIn Ads"  status="not-connected" color="#0A66C2"/>
+            </Field>
+            <Field label="Email" gap="loose">
+              <ConnectRow Icon={Mail}      name="Mailchimp"     status="not-connected" color="#FFE01B"/>
+              <ConnectRow Icon={Mail}      name="Klaviyo"       status="not-connected" color="#0C2340"/>
+              <ConnectRow Icon={Mail}      name="ConvertKit"    status="not-connected" color="#FB6970"/>
+            </Field>
+            <Field label="CRM / Automation" gap="loose">
+              <ConnectRow Icon={Activity}  name="HubSpot"       status="not-connected" color="#FF7A59"/>
+              <ConnectRow Icon={Activity}  name="Salesforce"    status="not-connected" color="#00A1E0"/>
+              <ConnectRow Icon={Activity}  name="Zapier"        status="connected"     color="#FF4A00"/>
+              <ConnectRow Icon={Activity}  name="Make (Integromat)" status="not-connected" color="#6D00CC"/>
+            </Field>
+          </div>
+        )}
+
+        {tab === 'notifications' && (
+          <div className="space-y-3">
+            <Field label="Email alerts" gap="loose">
+              <Toggle label="On every conversion" />
+              <Toggle label="Daily summary" defaultOn/>
+              <Toggle label="On error / downtime" defaultOn/>
+            </Field>
+            <Field label="Slack" gap="loose">
+              <ConnectRow Icon={Activity} name="Slack workspace" status="not-connected" color="#4A154B"/>
+              <Toggle label="Post conversions to channel" />
+            </Field>
+            <Field label="Recipient">
+              <input defaultValue="ryan@estage.com"
+                className="w-full h-8 px-2.5 text-[12px] text-ink bg-surface-sub border border-line-soft rounded-md outline-none focus:border-brand"/>
+            </Field>
+          </div>
+        )}
+
+        {tab === 'privacy' && (
+          <div className="space-y-3">
+            <Field label="Visibility" gap="loose">
+              <Toggle label="Indexable in search engines" />
+              <Toggle label="Public preview link" defaultOn/>
+              <Toggle label="Show in Estage marketplace" />
+            </Field>
+            <Field label="Compliance" gap="loose">
+              <Toggle label="GDPR cookie banner" defaultOn/>
+              <Toggle label="CCPA opt-out link" defaultOn/>
+              <Toggle label="Strip IP addresses from analytics" />
+            </Field>
+            <Field label="Data retention">
+              <select defaultValue="365"
+                className="w-full h-8 pl-2 pr-7 text-[12px] text-ink bg-surface-sub border border-line-soft rounded-md outline-none focus:border-brand">
+                <option value="30">30 days</option>
+                <option value="90">90 days</option>
+                <option value="180">6 months</option>
+                <option value="365">1 year</option>
+                <option value="forever">Forever</option>
+              </select>
+            </Field>
+          </div>
+        )}
+
+        {tab === 'danger' && (
+          <div className="space-y-3">
+            <div className="border border-bad/30 bg-bad-soft/40 rounded-md p-3">
+              <div className="text-[12.5px] font-semibold text-ink mb-1">Archive funnel</div>
+              <div className="text-[11.5px] text-ink-soft mb-2 leading-snug">Hides the funnel and stops collecting data. You can restore it later.</div>
+              <button className="h-7 px-2.5 text-[11.5px] font-semibold text-bad-deep bg-white border border-bad/30 rounded hover:bg-bad-soft transition-colors">Archive</button>
+            </div>
+            <div className="border border-bad/30 bg-bad-soft/40 rounded-md p-3">
+              <div className="text-[12.5px] font-semibold text-ink mb-1">Reset analytics</div>
+              <div className="text-[11.5px] text-ink-soft mb-2 leading-snug">Clears all visit, conversion, and revenue data for this funnel.</div>
+              <button className="h-7 px-2.5 text-[11.5px] font-semibold text-bad-deep bg-white border border-bad/30 rounded hover:bg-bad-soft transition-colors">Reset analytics</button>
+            </div>
+            <div className="border border-bad bg-bad-soft rounded-md p-3">
+              <div className="text-[12.5px] font-semibold text-bad-deep mb-1">Delete funnel</div>
+              <div className="text-[11.5px] text-ink-muted mb-2 leading-snug">Permanently delete this funnel and all associated data. Cannot be undone.</div>
+              <button className="h-7 px-2.5 text-[11.5px] font-semibold text-white bg-bad hover:bg-bad-deep rounded transition-colors">Delete funnel</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ConnectRow — used inside FunnelSettingsTabs. Status: 'connected' | 'not-connected'. */
+function ConnectRow({ Icon, name, status, color }) {
+  const [s, setS] = useState(status);
+  return (
+    <div className="flex items-center gap-2.5 px-2.5 py-1.5 bg-white border border-line-soft rounded-md">
+      <span className="w-7 h-7 rounded-md inline-flex items-center justify-center shrink-0"
+        style={{ background: color + '1a', color }}>
+        <Icon size={14}/>
+      </span>
+      <div className="flex-1 min-w-0">
+        <div className="text-[12px] font-medium text-ink truncate">{name}</div>
+        <div className="text-[10.5px] text-ink-soft mt-px inline-flex items-center gap-1">
+          <span className={`w-1.5 h-1.5 rounded-full ${s === 'connected' ? 'bg-good live-dot' : 'bg-ink-soft'}`}/>
+          {s === 'connected' ? 'Connected' : 'Not connected'}
+        </div>
+      </div>
+      <button onClick={() => setS(s === 'connected' ? 'not-connected' : 'connected')}
+        className={`h-7 px-2.5 text-[11px] font-semibold rounded transition-colors shrink-0 ${
+          s === 'connected'
+            ? 'text-bad-deep bg-white border border-line hover:bg-bad-soft hover:border-bad'
+            : 'text-white bg-genesis hover:bg-genesis-hover'
+        }`}>
+        {s === 'connected' ? 'Disconnect' : 'Connect'}
+      </button>
+    </div>
+  );
+}
 function ContextMenu({ x, y, items, onClose }) {
   const ref = useRef(null);
   const [adjusted, setAdjusted] = useState({ x, y, up: false });
@@ -777,7 +951,7 @@ function TemplateModal({ template, onClose, onConfirm }) {
   );
 }
 
-function Sidebar({ onAIClick, collapsed, onToggleCollapsed, focusSection, onFocusSection, onTemplateClick, canvasApi }) {
+function Sidebar({ onAIClick, collapsed, onToggleCollapsed, focusSection, onFocusSection, onTemplateClick, canvasApi, canvasNodes = [] }) {
   const [open, setOpen] = useState({ pages:true, inFunnel:false, sources:true, templates:false });
   const [folder, setFolder] = useState('root');
   const [search, setSearch] = useState('');
@@ -795,28 +969,62 @@ function Sidebar({ onAIClick, collapsed, onToggleCollapsed, focusSection, onFocu
   }, [focusSection]);
 
   const cur = FOLDERS[folder];
+  const q = search.trim().toLowerCase();
+  const matches = (s) => !q || (s || '').toLowerCase().includes(q);
   const folderItems = useMemo(() => {
     return cur.items
       .map(id => PAGES[id] ? { kind:'page', ...PAGES[id] } : { kind:'folder', ...FOLDERS[id] })
-      .filter(it => !search || (it.title || it.name || '').toLowerCase().includes(search.toLowerCase()));
-  }, [folder, search]);
+      .filter(it => matches(it.title || it.name));
+  }, [folder, q]);
+  // Derive "In this funnel" entirely from canvas nodes (page type only).
+  // Click pans canvas to the node + selects it.
+  const inFunnelLive = useMemo(
+    () => canvasNodes.filter(n => n.type === 'page').map(n => ({
+      id:      n.id,
+      title:   n.data.title || 'Untitled page',
+      path:    n.data.path,
+      status:  n.data.status || 'draft',
+      type:    n.data.pageType || 'custom',
+    })),
+    [canvasNodes]
+  );
+  const inFunnelMatches = useMemo(() => inFunnelLive.filter(p => matches(p.title)), [inFunnelLive, q]);
+  // Set of source IDs currently on canvas — used to gate the "In funnel" pill.
+  const sourceIdsOnCanvas = useMemo(
+    () => new Set(canvasNodes.filter(n => n.type === 'source').map(n => n.data.src).filter(Boolean)),
+    [canvasNodes]
+  );
+  const sourceMatches = useMemo(() => SOURCES.filter(s => matches(s.name)), [q]);
+  const templateMatches = useMemo(() => TEMPLATES.filter(t => matches(t.name)), [q]);
+  const isSearching = !!q;
+  const totalMatches = (isSearching
+    ? folderItems.length + inFunnelMatches.length + sourceMatches.length + templateMatches.length
+    : null);
 
-  const onPageContext = (e, page) => {
+  const onPageContext = (e, page, section) => {
     e.preventDefault(); e.stopPropagation();
-    setCtxMenu({
-      x: e.clientX, y: e.clientY,
-      items: [
-        { label:'Edit in builder',  icon:<Sparkles     size={14}/>, action: () => {} },
-        { label:'Open in new tab',  icon:<ExternalLink size={14}/>, action: () => window.open('#preview-'+page.id,'_blank') },
-        { label:'Rename',           icon:<Edit         size={14}/>, action: () => {} },
-        { label:'Duplicate',        icon:<Copy         size={14}/>, action: () => {} },
+    // Two distinct menus based on which sidebar section the user right-clicked:
+    //   'library'   → Estage page library; minimal (edit / open).
+    //   'in-funnel' → page in this funnel; full set (edit / open / rename / dup / delete).
+    let items;
+    if (section === 'library') {
+      items = [
+        { label:'Edit in builder', icon:<Sparkles     size={14}/>, action: () => {} },
+        { label:'Open in new tab', icon:<ExternalLink size={14}/>, action: () => window.open('#preview-'+page.id,'_blank') },
+      ];
+    } else {
+      items = [
+        { label:'Edit in builder',   icon:<Sparkles     size={14}/>, action: () => {} },
+        { label:'Open in new tab',   icon:<ExternalLink size={14}/>, action: () => window.open('#preview-'+page.id,'_blank') },
+        { label:'Rename in funnel',  icon:<Edit         size={14}/>, action: () => {} },
+        { label:'Duplicate',         icon:<Copy         size={14}/>, action: () => {} },
         { divider:true },
-        { label:'Delete page',      icon:<Trash        size={14}/>, action: () => {
-          // Remove from canvas (if present) by matching title.
+        { label:'Delete from funnel', icon:<Trash       size={14}/>, action: () => {
           canvasApi?.current?.removeNodeByTitle(page.title);
         }, danger:true },
-      ]
-    });
+      ];
+    }
+    setCtxMenu({ x: e.clientX, y: e.clientY, items });
   };
 
   if (collapsed) {
@@ -888,8 +1096,9 @@ function Sidebar({ onAIClick, collapsed, onToggleCollapsed, focusSection, onFocu
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto scroll-thin">
-        <div ref={sectionRefs.pages}>
-          <Section title="Your pages" count={Object.keys(PAGES).length} open={open.pages} onToggle={() => toggle('pages')}>
+        {(!isSearching || folderItems.length > 0) && <div ref={sectionRefs.pages}>
+          <Section title="Your pages" count={isSearching ? folderItems.length : Object.keys(PAGES).length}
+            open={isSearching ? true : open.pages} onToggle={() => toggle('pages')}>
             {folder !== 'root' && (
               <div className="flex items-center gap-1 px-4 pb-1 text-[11px]">
                 <button onClick={() => setFolder(cur.parent || 'root')} className="inline-flex items-center gap-1 text-ink-muted hover:text-ink transition-colors">
@@ -906,35 +1115,56 @@ function Sidebar({ onAIClick, collapsed, onToggleCollapsed, focusSection, onFocu
                     isInFunnel={PAGES_IN_FUNNEL_IDS.has(it.id)}
                     active={activePage === it.id}
                     onClick={() => setActivePage(it.id)}
-                    onContextMenu={(e) => onPageContext(e, it)}/>
+                    onContextMenu={(e) => onPageContext(e, it, 'library')}/>
             )}
           </Section>
-        </div>
+        </div>}
 
-        <div ref={sectionRefs.inFunnel}>
-          <Section title="In this funnel" count={IN_FUNNEL.length} open={open.inFunnel} onToggle={() => toggle('inFunnel')}>
-            {IN_FUNNEL.map(p =>
+        {(!isSearching || inFunnelMatches.length > 0) && <div ref={sectionRefs.inFunnel}>
+          <Section title="In this funnel" count={isSearching ? inFunnelMatches.length : inFunnelLive.length}
+            open={isSearching ? true : open.inFunnel} onToggle={() => toggle('inFunnel')}>
+            {(isSearching ? inFunnelMatches : inFunnelLive).length === 0 && !isSearching && (
+              <div className="px-4 py-3 text-[11px] text-ink-soft leading-relaxed">
+                No pages on the canvas yet. Drag a page from "Your pages" or use Quick&nbsp;add.
+              </div>
+            )}
+            {(isSearching ? inFunnelMatches : inFunnelLive).map(p =>
               <PageRow key={p.id} page={p} inFunnel draggable={false}
                 active={activePage === p.id}
-                onClick={() => setActivePage(p.id)}
-                onContextMenu={(e) => onPageContext(e, p)}/>
+                onClick={() => {
+                  setActivePage(p.id);
+                  canvasApi?.current?.panToNodeByTitle(p.title);
+                }}
+                onContextMenu={(e) => onPageContext(e, p, 'in-funnel')}/>
             )}
           </Section>
-        </div>
+        </div>}
 
-        <div ref={sectionRefs.sources}>
-          <Section title="Traffic sources" count={SOURCES.length} open={open.sources} onToggle={() => toggle('sources')}>
-            {SOURCES.map(s => <SourceRow key={s.id} source={s}/>)}
+        {(!isSearching || sourceMatches.length > 0) && <div ref={sectionRefs.sources}>
+          <Section title="Traffic sources" count={isSearching ? sourceMatches.length : SOURCES.length}
+            open={isSearching ? true : open.sources} onToggle={() => toggle('sources')}>
+            {(isSearching ? sourceMatches : SOURCES).map(s => <SourceRow key={s.id} source={s} inFunnel={sourceIdsOnCanvas.has(s.id)}/>)}
           </Section>
-        </div>
+        </div>}
 
-        <div ref={sectionRefs.templates}>
-          <Section title="Templates" count={TEMPLATES.length} open={open.templates} onToggle={() => toggle('templates')} last>
+        {(!isSearching || templateMatches.length > 0) && <div ref={sectionRefs.templates}>
+          <Section title="Templates" count={isSearching ? templateMatches.length : TEMPLATES.length}
+            open={isSearching ? true : open.templates} onToggle={() => toggle('templates')} last>
             <div className="space-y-1.5 py-1">
-              {TEMPLATES.map(t => <TemplateCard key={t.id} tpl={t} onClick={() => onTemplateClick(t)}/>)}
+              {(isSearching ? templateMatches : TEMPLATES).map(t => <TemplateCard key={t.id} tpl={t} onClick={() => onTemplateClick(t)}/>)}
             </div>
           </Section>
-        </div>
+        </div>}
+
+        {isSearching && totalMatches === 0 && (
+          <div className="px-4 py-12 text-center">
+            <div className="w-10 h-10 rounded-full bg-surface-sub mx-auto mb-3 inline-flex items-center justify-center">
+              <SearchIcon size={14} className="text-ink-soft"/>
+            </div>
+            <div className="text-[12px] font-semibold text-ink mb-1">No results</div>
+            <div className="text-[11px] text-ink-soft">No funnel items match &ldquo;{search}&rdquo;.</div>
+          </div>
+        )}
       </div>
 
       <div className="border-t border-line-soft bg-surface-sub p-2.5 shrink-0">
@@ -1059,9 +1289,9 @@ function PageRow({ page, inFunnel, draggable=true, active=false, isInFunnel=fals
   );
 }
 
-function SourceRow({ source }) {
+function SourceRow({ source, inFunnel: inFunnelProp = null }) {
   const Ic = source.Icon;
-  const inFunnel = source.usage === 'in-funnel';
+  const inFunnel = inFunnelProp !== null ? inFunnelProp : source.usage === 'in-funnel';
   const onDragStart = (e) => {
     e.dataTransfer.setData('application/x-funnel-node', JSON.stringify({
       kind: 'source',
@@ -1288,8 +1518,28 @@ function Wireframe({ type }) {
    structure exactly: 2px colored top border in PAGE_TYPE.color, 1px line border
    on other sides, selected = colored all around, single X chip on hover (matches
    logic card), ConnectorDot for outgoing connections, drag-from-card-body. ─── */
+const PAGE_ICON_LOOKUP = {
+  file:  FileIcon,
+  home:  HomeIcon,
+  cart:  Cart,
+  check: Check,
+  mail:  Mail,
+  video: PlayIcon,
+  star:  StarIcon,
+  gift:  GiftIcon,
+};
+
 function PageNode({ node, selected, mode, onSelect, onDragStart, onConnectStart, onRemove }) {
-  const t = PAGE_TYPE[node.data.pageType] || PAGE_TYPE.custom;
+  const readonly = mode === 'analyse';
+  const baseT = PAGE_TYPE[node.data.pageType] || PAGE_TYPE.custom;
+  const isCustom = node.data.pageType === 'custom';
+  // Custom mode reads icon/color from data; otherwise uses type defaults.
+  const customIcon = (isCustom && node.data.icon && PAGE_ICON_LOOKUP[node.data.icon]) || null;
+  const t = {
+    color: (isCustom && node.data.color) ? node.data.color : baseT.color,
+    Icon:  customIcon || baseT.Icon,
+    label: baseT.label,
+  };
   const TIcon = t.Icon;
   const { title, path, status, visitors, rate, screenshot } = node.data;
   const showMetrics = mode === 'analyse';
@@ -1297,6 +1547,7 @@ function PageNode({ node, selected, mode, onSelect, onDragStart, onConnectStart,
 
   const handleCardMouseDown = (e) => {
     if (e.target.closest('button, [data-no-drag], [data-connector-dot]')) return;
+    if (readonly) return;
     e.stopPropagation();
     onDragStart(node.id, e);
   };
@@ -1326,6 +1577,20 @@ function PageNode({ node, selected, mode, onSelect, onDragStart, onConnectStart,
           </Tip>
         </div>
       </div>
+
+      {/* Optimise-mode suggestion sparkle — top-right of card.
+         Click opens the OptimiseSuggestionModal at bottom-centre. */}
+      {mode === 'optimise' && !node.data.dismissed && (
+        <div className="absolute -top-2 -right-2 z-30 pointer-events-auto">
+          <Tip label="A/B test the headline (+14% lift)" side="top">
+            <button data-no-drag
+              onClick={(e) => { e.stopPropagation(); window.dispatchEvent(new CustomEvent('open-suggestion', { detail: { nodeId: node.id, title: node.data.title } })); }}
+              className="w-6 h-6 inline-flex items-center justify-center rounded-full bg-violet text-white shadow-card ai-ripple hover:bg-violet-deep transition-colors">
+              <Spark size={11} className="ai-breathe-icon"/>
+            </button>
+          </Tip>
+        </div>
+      )}
 
       {/* card body — same border/shadow system as SourceNode */}
       <div
@@ -1382,23 +1647,38 @@ function PageNode({ node, selected, mode, onSelect, onDragStart, onConnectStart,
           )}
         </div>
 
-        {/* BOTTOM METRIC ROW — analyse mode only, mirrors source card analyse row */}
-        {showMetrics && (
-          <div className="relative px-3 pb-2.5 pt-1.5 border-t border-line-soft mt-0.5 flex items-center gap-2 text-[11px]">
-            <Eye size={11} className="text-ink-soft shrink-0"/>
-            <span className="font-semibold tabular-nums text-ink">{visitors?.toLocaleString() || '—'}</span>
-            <span className="text-ink-soft">visitors</span>
-            {rate != null && (
-              <span className="ml-auto inline-flex items-center px-1.5 py-0.5 rounded text-[10.5px] font-semibold tabular-nums bg-good-soft text-good-deep flex-shrink-0 leading-tight">
-                {rate.toFixed(0)}%
-              </span>
-            )}
-          </div>
-        )}
+        {/* BOTTOM METRIC ROW — analyse mode only.
+           Visitors, conversion %, drop-off %, avg time. Each stat in a
+           muted chip; conversion pulls bg-good-soft when above 5%. */}
+        {showMetrics && (() => {
+          const conv = rate != null ? rate : (visitors ? Math.max(2, Math.min(28, (visitors % 13) + 4)) : null);
+          const drop = visitors ? Math.max(8, Math.min(90, 100 - (conv || 0) - 12)) : null;
+          const dwell = ['0:24','1:08','0:52','2:14','0:41'][(visitors || 0) % 5];
+          return (
+            <div className="relative px-3 pb-2.5 pt-2 border-t border-line-soft mt-0.5 grid grid-cols-4 gap-1.5 text-[10.5px]">
+              <div className="flex flex-col">
+                <span className="text-ink-soft tabular-nums">Visits</span>
+                <span className="font-semibold tabular-nums text-ink leading-tight">{visitors?.toLocaleString() || '—'}</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-ink-soft tabular-nums">Conv</span>
+                <span className={`font-semibold tabular-nums leading-tight ${conv >= 5 ? 'text-good-deep' : 'text-ink'}`}>{conv != null ? conv.toFixed(0) + '%' : '—'}</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-ink-soft tabular-nums">Drop</span>
+                <span className="font-semibold tabular-nums leading-tight text-ink">{drop != null ? drop.toFixed(0) + '%' : '—'}</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-ink-soft tabular-nums">Time</span>
+                <span className="font-semibold tabular-nums leading-tight text-ink">{dwell}</span>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* output connector — pages can be drag-source for connections to other pages */}
-      <ConnectorDot side="right" nodeId={node.id} onConnectStart={onConnectStart}/>
+      <ConnectorDot side="right" nodeId={node.id} onConnectStart={onConnectStart} hidden={readonly}/>
     </div>
   );
 }
@@ -1406,7 +1686,8 @@ function PageNode({ node, selected, mode, onSelect, onDragStart, onConnectStart,
 /* ─── CONNECTOR DOT — single floating handle for source nodes.
    Brand-blue filled, white double-halo, scales on hover, opacity on parent group hover.
    mousedown starts connection drag (event stopped so card-body drag doesn't trigger). ─── */
-function ConnectorDot({ side, nodeId, onConnectStart, color, branch, alwaysVisible }) {
+function ConnectorDot({ side, nodeId, onConnectStart, color, branch, alwaysVisible, hidden }) {
+  if (hidden) return null;
   const positions = {
     top:    'left-1/2 top-0    -translate-x-1/2 -translate-y-1/2',
     right:  'right-0 top-1/2  -translate-y-1/2  translate-x-1/2',
@@ -1442,6 +1723,7 @@ function hexToRGB(hex) {
 /* ─── SOURCE NODE — single floating output handle, threshold colors, count-up
    animation, action chips floating above on hover, draggable body. ─── */
 function SourceNode({ node, selected, onSelect, onDragStart, onConnectStart, onChangeSource, onRemove, target, mode }) {
+  const readonly = mode === 'analyse';
   const src = SOURCE_BY_ID[node.data.src] || SOURCES[0];
   const Ic = src.Icon;
   const count = target?.count || 0;
@@ -1458,6 +1740,7 @@ function SourceNode({ node, selected, onSelect, onDragStart, onConnectStart, onC
 
   const handleCardMouseDown = (e) => {
     if (e.target.closest('button, [data-no-drag], [data-connector-dot]')) return;
+    if (readonly) return;
     e.stopPropagation();
     onDragStart(node.id, e);
   };
@@ -1599,7 +1882,7 @@ function SourceNode({ node, selected, onSelect, onDragStart, onConnectStart, onC
       </div>
 
       {/* single floating output handle — right edge only; sources only emit */}
-      <ConnectorDot side="right" nodeId={node.id} onConnectStart={onConnectStart}/>
+      <ConnectorDot side="right" nodeId={node.id} onConnectStart={onConnectStart} hidden={readonly}/>
     </div>
   );
 }
@@ -1614,7 +1897,8 @@ const LOGIC_KIND = {
   condition: { label: 'Condition', subtitle: 'rule-based split', primaryBranch:'yes', secondaryBranch:'no' },
   abtest:    { label: 'A/B Test',  subtitle: 'random split',     primaryBranch:'a',   secondaryBranch:'b'  },
 };
-function LogicNode({ node, selected, onSelect, onDragStart, onConnectStart, onRemove, outgoingCount }) {
+function LogicNode({ node, selected, onSelect, onDragStart, onConnectStart, onRemove, outgoingCount, mode }) {
+  const readonly = mode === 'analyse';
   const kind = LOGIC_KIND[node.data.kind] || LOGIC_KIND.condition;
   const Ic = node.data.kind === 'abtest' ? Bars : Workflow;
   const VIOLET = '#7C3AED';
@@ -1623,6 +1907,7 @@ function LogicNode({ node, selected, onSelect, onDragStart, onConnectStart, onRe
 
   const handleCardMouseDown = (e) => {
     if (e.target.closest('button, [data-no-drag], [data-connector-dot]')) return;
+    if (readonly) return;
     e.stopPropagation();
     onDragStart(node.id, e);
   };
@@ -1858,7 +2143,7 @@ function computeEdgeGeometry(a, b, allNodes, mode, edge) {
    Lucide path geometry the source card chip uses (`<X size={11}/>` etc.) — wrapped
    in scale(11/24) + translate(-12,-12) so stroke width and proportions match
    pixel-for-pixel rather than approximating with hand-drawn lines. ─── */
-function EdgeChip({ x, y, onInsert, onRemove, onHover }) {
+function EdgeChip({ x, y, onInsert, onRemove, onHover, onStats, mode }) {
   const [hoverBtn, setHoverBtn] = useState(null); /* 'insert' | 'remove' | null */
   const W = 48, H = 24, R = 6;
   const onEnter = (e) => onHover && onHover(e);
@@ -1934,8 +2219,8 @@ function EdgePaths({ nodes, edges, hovered, onHover, mode }) {
             <path d={geo.path} stroke="transparent" strokeWidth={28} fill="none"
                   style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
                   onMouseEnter={() => onHover(i)} onMouseLeave={() => onHover(null)}/>
-            {/* visible path */}
-            <path d={geo.path} stroke={stroke} strokeWidth="2" fill="none" strokeLinecap="round"
+            {/* visible path — uniform 2px (no volume-weighting; visual consistency) */}
+            <path d={geo.path} stroke={stroke} strokeWidth={2} fill="none" strokeLinecap="round"
                   style={{ transition: 'stroke 140ms ease' }}/>
           </g>
         );
@@ -1957,9 +2242,10 @@ function EdgeBranchBadge({ x, y, branch }) {
   if (!meta) return null;
   return (
     <g transform={`translate(${x}, ${y})`} style={{ pointerEvents: 'none' }}>
-      <circle r="9" fill={meta.color} stroke="white" strokeWidth="2.5"
+      <circle r="8" fill={meta.color} stroke="white" strokeWidth="1"
               style={{ filter: 'drop-shadow(0 1px 2px rgba(15,23,42,0.18))' }}/>
-      <text textAnchor="middle" dominantBaseline="central" fontSize="10" fontWeight="700" fill="white"
+      <text x="0" y="0.5" textAnchor="middle" dominantBaseline="middle"
+            fontSize="9" fontWeight="700" fill="white"
             style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}>{meta.letter}</text>
     </g>
   );
@@ -1969,6 +2255,7 @@ function EdgeBranchBadge({ x, y, branch }) {
    the destination arrow + persistent branch badge. Renders ABOVE nodes so neither
    chip nor arrow tip is occluded when an edge endpoint sits behind a card. ─── */
 function EdgeOverlays({ nodes, edges, zoom, hovered, onHover, onRemove, onInsert, mode }) {
+  const [statsOpen, setStatsOpen] = useState(null); // edge index whose stats popover is open
   const showArrow = zoom > 0.5;
   return (
     <svg className="absolute inset-0 overflow-visible"
@@ -2025,14 +2312,55 @@ function EdgeOverlays({ nodes, edges, zoom, hovered, onHover, onRemove, onInsert
                 </g>
               );
             })()}
-            {/* hover state — single white pill with [+ insert] | [× remove] */}
-            {showInteractive && (
+            {/* hover state — single white pill with [+ insert] | [× remove],
+                plus an Analyse-only stats button + popover sibling */}
+            {showInteractive && (<>
               <EdgeChip
                 x={geo.mx} y={geo.my + (hasLabel ? 14 : 0)}
                 onHover={() => onHover(i)}
                 onInsert={() => onInsert(i, geo.mx, geo.my)}
                 onRemove={() => onRemove(i)}/>
-            )}
+
+            {mode === 'analyse' && (() => {
+              const isOpen = statsOpen === i;
+              const e2 = edges[i];
+              const fromNode = nodes.find(n => n.id === e2?.from);
+              // Mock figures derived from edge volume
+              const vol = e2?.volume || 0;
+              const conv = vol ? Math.round((vol / Math.max(1, fromNode?.data?.visitorsNum || 100)) * 100) : 0;
+              return (
+                <foreignObject x={geo.mx + 18} y={geo.my - 11} width={26} height={22} style={{ overflow: 'visible', pointerEvents: 'auto' }}>
+                  <div style={{ width: 26, position: 'relative' }}>
+                    <button onClick={(ev) => { ev.stopPropagation(); setStatsOpen(isOpen ? null : i); }}
+                      title="Path stats"
+                      className="w-[22px] h-[22px] inline-flex items-center justify-center rounded-md bg-white border border-line shadow-xs hover:border-brand text-ink-muted hover:text-brand transition-colors">
+                      <TrendingUp size={10}/>
+                    </button>
+                    {isOpen && (
+                      <div onClick={(ev) => ev.stopPropagation()}
+                        className="absolute left-0 top-7 z-50 w-[220px] bg-white rounded-md border border-line shadow-menu p-3 ctx-menu"
+                        style={{ pointerEvents: 'auto' }}>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="text-[10.5px] font-semibold uppercase tracking-wider text-ink-soft">Path stats</div>
+                          <button onClick={() => setStatsOpen(null)}
+                            className="text-ink-soft hover:text-ink"><X size={11}/></button>
+                        </div>
+                        <div className="space-y-1.5 text-[11.5px]">
+                          <div className="flex justify-between"><span className="text-ink-soft">Visitors</span><span className="text-ink font-semibold tabular-nums">{vol.toLocaleString()}</span></div>
+                          <div className="flex justify-between"><span className="text-ink-soft">Conversion</span><span className="text-ink font-semibold tabular-nums">{conv}%</span></div>
+                          <div className="flex justify-between"><span className="text-ink-soft">Drop-off</span><span className="text-ink font-semibold tabular-nums">{Math.max(0, 100 - conv)}%</span></div>
+                          <div className="flex justify-between"><span className="text-ink-soft">Time-to-next</span><span className="text-ink font-semibold tabular-nums">0:42</span></div>
+                        </div>
+                        <div className="mt-2 pt-2 border-t border-line-soft text-[10.5px] text-ink-soft leading-snug">
+                          Calculated from last-7-day traffic. Drop-off = visitors who entered this edge but didn't reach the next step.
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </foreignObject>
+              );
+            })()}
+            </>)}
           </g>
         );
       })}
@@ -2176,7 +2504,7 @@ function ConnectionGhost({ from, side, to, branch }) {
 
 
 /* ─── CANVAS — main interactive surface ─── */
-function Canvas({ mode, demoState, onDemoStateChange, onJumpToTemplates, onJumpToPages, onSelectionChange, canvasApiRef }) {
+function Canvas({ mode, demoState, onDemoStateChange, onJumpToTemplates, onJumpToPages, onSelectionChange, canvasApiRef, onNodesChange }) {
   const initial = DEMO_STATES[demoState] || DEMO_STATES.empty;
   /* mutable state — drag, drop-to-connect, edge-disconnect all need to mutate this.
      Reset on demo-state change. */
@@ -2185,6 +2513,7 @@ function Canvas({ mode, demoState, onDemoStateChange, onJumpToTemplates, onJumpT
 
   const containerRef = useRef(null);
   const [pan, setPan]   = useState({ x: 0, y: 0 });
+  const canvasViewportEl = useRef(null);
   const [zoom, setZoom] = useState(1);
   const [selected, setSelected] = useState(null);
   const [hoveredEdge, setHoveredEdge] = useState(null);
@@ -2315,8 +2644,27 @@ function Canvas({ mode, demoState, onDemoStateChange, onJumpToTemplates, onJumpT
           return ns.filter(n => n.id !== match.id);
         });
       },
+      getNodes: () => nodes,
+      panToNodeByTitle: (title) => {
+        const match = nodes.find(n => n.data && n.data.title === title);
+        if (!match) return;
+        const w = NODE_W[match.type];
+        const h = getNodeH(match, mode);
+        const cx = match.x + w / 2;
+        const cy = match.y + h / 2;
+        const vw = canvasViewportEl.current?.clientWidth  || 800;
+        const vh = canvasViewportEl.current?.clientHeight || 500;
+        setPan({ x: vw / 2 - cx * zoom, y: vh / 2 - cy * zoom });
+        setSelected(match.id);
+      },
     };
-  }, [canvasApiRef, nodes, pan, zoom]);
+  }, [canvasApiRef, nodes, pan, zoom, mode]);
+
+  /* Notify parent of canvas-nodes changes so the Sidebar can derive
+     "what's actually in the funnel right now". */
+  useEffect(() => {
+    if (typeof onNodesChange === 'function') onNodesChange(nodes);
+  }, [nodes, onNodesChange]);
 
   /* derive source → target lookup for source-card "To Landing X%" rendering.
      Includes count of outgoing edges so the card can switch UI for 0 / 1 / 2+ cases. */
@@ -2328,10 +2676,12 @@ function Canvas({ mode, demoState, onDemoStateChange, onJumpToTemplates, onJumpT
       const toNode = nodes.find(n => n.id === e.to);
       if (!toNode) return;
       const num = fromNode.data.visitorsNum || 1;
+      const branch = { title: toNode.data.title, rate: Math.round(((e.volume || 0) / num) * 100), volume: e.volume || 0 };
       if (!map[e.from]) {
-        map[e.from] = { title: toNode.data.title, rate: Math.round((e.volume / num) * 100), count: 1 };
+        map[e.from] = { title: toNode.data.title, rate: branch.rate, count: 1, branches: [branch] };
       } else {
         map[e.from].count += 1;
+        map[e.from].branches.push(branch);
       }
     });
     return map;
@@ -2894,7 +3244,9 @@ function Canvas({ mode, demoState, onDemoStateChange, onJumpToTemplates, onJumpT
         </div>
       )}
 
-      {/* zoom controls — only when there are nodes */}
+      {/* canvas top-left controls + optimise tests panel + zoom */}
+      <ExportFunnelButton/>
+      {mode === "optimise" && <OptimiseTestsPanel/>}
       {!isEmpty && <ZoomControls
         zoom={zoom}
         onZoomIn={() => setZoom(z => Math.min(2, z + 0.1))}
@@ -3027,7 +3379,9 @@ function inspectorMeta(node) {
   return { color: '#94A3B8', Icon: FileIcon, kindLabel: '—', title: '—' };
 }
 
-/* InspectorTabs — three-tab strip below header */
+/* InspectorTabs — three-tab strip below header. Typography mirrors
+   topbar Build/Analyse/Optimise tabs: 12px medium, light grey → dark active,
+   no underline indicator. */
 function InspectorTabs({ tab, onTabChange }) {
   const tabs = [
     { id: 'details',  label: 'Details'  },
@@ -3038,10 +3392,9 @@ function InspectorTabs({ tab, onTabChange }) {
     <div className="border-b border-line-soft flex items-stretch px-2">
       {tabs.map(t => (
         <button key={t.id} onClick={() => onTabChange(t.id)}
-          className={`flex-1 px-2 py-2 text-[11.5px] font-semibold transition-colors relative
+          className={`flex-1 px-2 py-2 text-[12px] font-medium transition-colors
                       ${tab === t.id ? 'text-ink' : 'text-ink-soft hover:text-ink-muted'}`}>
           {t.label}
-          {tab === t.id && <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-brand rounded-full"/>}
         </button>
       ))}
     </div>
@@ -3111,28 +3464,66 @@ function DetailsPage({ node, api, mode }) {
 
 /* SOURCE DETAILS — Performance + Top campaigns + Actions */
 function DetailsSource({ node, api, mode }) {
+  const isCustom = node.data.src === 'custom';
   const s = SOURCES.find(p => p.id === node.data.src) || SOURCES[0];
   const visitors = node.data.visitorsNum || 0;
   const cpl = node.data.cpl != null ? '$' + node.data.cpl.toFixed(2) : '—';
-  // Default to connected so existing demo sources show real performance data.
   const connected = node.data.connected !== false;
+  const customName  = node.data.customName  || 'Custom source';
+  const customColor = node.data.customColor || '#475569';
+
   return (
     <div className="px-4 py-3 space-y-4">
-      <InspSection label="Connection">
-        <div className="flex items-center gap-2 px-2.5 py-2 bg-surface-sub border border-line-soft rounded-md">
-          <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-good live-dot' : 'bg-ink-soft'}`}/>
-          <span className="text-[11.5px] text-ink font-medium">{connected ? 'Connected' : 'Not connected'}</span>
-          <span className="flex-1"/>
-          <button onClick={() => api.updateNodeData(node.id, { connected: !connected })}
-            className={`h-7 px-2.5 text-[11px] font-semibold rounded transition-colors ${
-              connected
-                ? 'text-bad-deep bg-white border border-line hover:bg-bad-soft hover:border-bad'
-                : 'text-white bg-genesis hover:bg-genesis-hover'
-            }`}>
-            {connected ? 'Disconnect' : 'Connect'}
-          </button>
-        </div>
+      {/* Type dropdown — switch between platform-connected and custom mode */}
+      <InspSection label="Source type">
+        <select value={node.data.src || 'fb'} onChange={(e) => api.updateNodeData(node.id, { src: e.target.value })}
+          className="w-full h-8 px-2 text-[11.5px] text-ink bg-surface-sub border border-line-soft rounded outline-none focus:border-brand">
+          {SOURCES.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          <option value="custom">Custom source…</option>
+        </select>
       </InspSection>
+
+      {/* Custom-source UI: name + color, no connection */}
+      {isCustom && (
+        <>
+          <InspSection label="Custom source">
+            <Field label="Name">
+              <input value={customName} onChange={(e) => api.updateNodeData(node.id, { customName: e.target.value })}
+                className="w-full h-7 px-2 text-[11.5px] text-ink bg-surface-sub border border-line-soft rounded outline-none focus:border-brand"/>
+            </Field>
+            <Field label="Color">
+              <div className="grid grid-cols-8 gap-1">
+                {['#006CB5','#10B981','#7C3AED','#F59E0B','#DC2626','#475569','#0891B2','#EC4899'].map(c => (
+                  <button key={c} onClick={() => api.updateNodeData(node.id, { customColor: c })}
+                    className={`w-7 h-7 rounded-md border-2 transition-transform hover:scale-105 ${
+                      customColor === c ? 'border-ink ring-2 ring-brand-soft' : 'border-white shadow-xs'
+                    }`}
+                    style={{ background: c }}/>
+                ))}
+              </div>
+            </Field>
+          </InspSection>
+        </>
+      )}
+
+      {/* Connection (platform sources only) */}
+      {!isCustom && (
+        <InspSection label="Connection">
+          <div className="flex items-center gap-2 px-2.5 py-2 bg-surface-sub border border-line-soft rounded-md">
+            <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-good live-dot' : 'bg-ink-soft'}`}/>
+            <span className="text-[11.5px] text-ink font-medium">{connected ? 'Connected' : 'Not connected'}</span>
+            <span className="flex-1"/>
+            <button onClick={() => api.updateNodeData(node.id, { connected: !connected })}
+              className={`h-7 px-2.5 text-[11px] font-semibold rounded transition-colors ${
+                connected
+                  ? 'text-bad-deep bg-white border border-line hover:bg-bad-soft hover:border-bad'
+                  : 'text-white bg-genesis hover:bg-genesis-hover'
+              }`}>
+              {connected ? 'Disconnect' : 'Connect'}
+            </button>
+          </div>
+        </InspSection>
+      )}
 
       <InspSection label="Performance">
         <Stat label="Visitors (7d)" value={visitors.toLocaleString()}/>
@@ -3276,7 +3667,7 @@ function ABTestSplitSlider({ node, api }) {
         </div>
         <input type="range" min="0" max="100" value={split}
           onChange={(e) => api.updateNodeData(node.id, { split: parseInt(e.target.value, 10) })}
-          className="w-full h-2 rounded-full appearance-none cursor-pointer"
+          className="ab-slider w-full appearance-none cursor-ew-resize"
           style={{ background: `linear-gradient(to right, #7C3AED 0%, #7C3AED ${split}%, #F59E0B ${split}%, #F59E0B 100%)` }}/>
       </div>
     </InspSection>
@@ -3284,16 +3675,278 @@ function ABTestSplitSlider({ node, api }) {
 }
 
 /* InspectorLeads — V6 stub for now */
+/* InspectorLeads — adaptive lead-flow table.
+   Columns and content vary by node type / kind. Anonymous leads on early
+   steps; enriched (email/name) once forms are submitted; order data on checkouts.
+   Uses mock data for now (real lead capture is API/backend work). */
 function InspectorLeads({ node }) {
-  return (
-    <div className="px-4 py-6 text-center">
-      <div className="w-10 h-10 rounded-full bg-surface-sub mx-auto mb-3 inline-flex items-center justify-center">
-        <Eye size={14} className="text-ink-soft"/>
+  const isPage   = node.type === 'page';
+  const isSource = node.type === 'source';
+  const isLogic  = node.type === 'logic';
+  const kind     = node.data.kind || node.data.pageType;
+  const [exportOpen, setExportOpen] = useState(false);
+
+  // Generate appropriate mock leads given the node type.
+  const leads = useMemo(() => buildMockLeads(node), [node.id, kind]);
+
+  if (!leads.length) {
+    return (
+      <div className="px-4 py-8 text-center">
+        <div className="w-10 h-10 rounded-full bg-surface-sub mx-auto mb-3 inline-flex items-center justify-center">
+          <Eye size={14} className="text-ink-soft"/>
+        </div>
+        <div className="text-[11.5px] font-semibold text-ink mb-1">No leads yet</div>
+        <div className="text-[11px] text-ink-soft leading-relaxed">Contacts who reach this step will appear here.</div>
       </div>
-      <div className="text-[11.5px] font-semibold text-ink mb-1">No leads yet</div>
-      <div className="text-[11px] text-ink-soft leading-relaxed">Contacts who reach this step will appear here. Connect a traffic source to start collecting.</div>
+    );
+  }
+
+  // Columns by node type. Email column removed everywhere — Identity covers
+  // it where useful (sources show name+email inline as Recipient).
+  const cols = (() => {
+    if (isSource && node.data.src === 'email') return ['Recipient', 'Status', 'Time'];
+    if (isSource) return ['Identity', 'Country', 'Device', 'Time'];
+    if (isLogic)  return ['Identity', 'Source', 'Branch', 'Time'];
+    if (isPage && (kind === 'checkout' || node.data.pageType === 'checkout'))
+      return ['Name', 'Order', 'Country', 'Time'];
+    if (isPage && (kind === 'form' || node.data.pageType === 'form'))
+      return ['Name', 'Source', 'Time'];
+    return ['Identity', 'Source', 'Country', 'Time'];
+  })();
+
+  return (
+    <div className="px-2 py-2">
+      <div className="px-2 py-1.5 flex items-center justify-between">
+        <div className="text-[10.5px] font-semibold uppercase tracking-wider text-ink-soft">{leads.length} leads</div>
+        <button onClick={() => setExportOpen(true)} className="text-[10.5px] text-brand font-medium hover:underline">Export</button>
+      </div>
+      {exportOpen && <ExportLeadsModal node={node} onClose={() => setExportOpen(false)}/>}
+      <table className="w-full">
+        <thead>
+          <tr>
+            {cols.map(c => (
+              <th key={c} className="text-[10px] font-semibold uppercase tracking-wider text-ink-soft text-left px-2 py-1">{c}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {leads.map((l, i) => (
+            <tr key={i} className="border-t border-line-soft hover:bg-surface-sub transition-colors cursor-pointer">
+              {cols.map(c => (
+                <td key={c} className="text-[11.5px] text-ink px-2 py-1 truncate" style={{ maxWidth: 110 }}>
+                  {leadCell(l, c)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
+}
+
+function leadCell(lead, col) {
+  switch (col) {
+    case 'Identity':
+      return lead.email
+        ? <span className="font-medium">{lead.email}</span>
+        : <span className="text-ink-soft italic">Anonymous</span>;
+    case 'Recipient':
+      return lead.name ? <span><span className="font-medium">{lead.name}</span> · <span className="text-ink-soft">{lead.email}</span></span> : lead.email;
+    case 'Email':
+      return lead.email || <span className="text-ink-soft">—</span>;
+    case 'Name':
+      return lead.name || <span className="text-ink-soft italic">No name</span>;
+    case 'Order':
+      return lead.order ? <span className="font-semibold tabular-nums">${lead.order}</span> : <span className="text-ink-soft">—</span>;
+    case 'Source':
+      return <span className="text-ink-muted">{lead.source}</span>;
+    case 'Country':
+      return <span className="text-ink-muted tabular-nums">{lead.country}</span>;
+    case 'Device':
+      return <span className="text-ink-muted">{lead.device}</span>;
+    case 'Branch':
+      return <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${lead.branch === 'Y' ? 'bg-good-soft text-good-deep' : 'bg-surface-muted text-ink-muted'}`}>{lead.branch}</span>;
+    case 'Status':
+      return <span className={`inline-flex items-center gap-1 text-[10.5px] ${lead.status === 'Opened' ? 'text-good-deep' : 'text-ink-muted'}`}>
+        <span className={`w-1.5 h-1.5 rounded-full ${lead.status === 'Opened' ? 'bg-good' : 'bg-ink-soft'}`}/>
+        {lead.status}
+      </span>;
+    case 'Time':
+      return <span className="text-ink-soft tabular-nums">{lead.time}</span>;
+    default:
+      return null;
+  }
+}
+
+
+/* ExportLeadsModal — universal export panel for any card's Leads tab.
+   Field list adapts to what's actually capturable for this node type so
+   irrelevant fields (e.g. Order value on a source card) don't appear. */
+function ExportLeadsModal({ node, onClose }) {
+  const isSource = node.type === 'source';
+  const isLogic  = node.type === 'logic';
+  const kind     = node.data.kind || node.data.pageType;
+
+  // Universal field set, gated by what makes sense for this card type.
+  const ALL_FIELDS = [
+    { id: 'time',      label: 'Time entered',      always: true  },
+    { id: 'identity',  label: 'Identity',          always: true  },
+    { id: 'name',      label: 'Name',              if: () => kind === 'checkout' || kind === 'form' || (isSource && node.data.src === 'email') },
+    { id: 'email',     label: 'Email',             if: () => kind === 'checkout' || (isSource && node.data.src === 'email') },
+    { id: 'phone',     label: 'Phone',             if: () => kind === 'checkout' },
+    { id: 'source',    label: 'Source',            if: () => !isSource },
+    { id: 'utm_source', label: 'UTM source',       always: true },
+    { id: 'utm_medium', label: 'UTM medium',       always: true },
+    { id: 'utm_camp',   label: 'UTM campaign',     always: true },
+    { id: 'country',   label: 'Country',           always: true },
+    { id: 'device',    label: 'Device',            always: true },
+    { id: 'browser',   label: 'Browser',           always: true },
+    { id: 'order',     label: 'Order value',       if: () => kind === 'checkout' },
+    { id: 'branch',    label: 'Branch taken',      if: () => isLogic },
+    { id: 'status',    label: 'Email status',      if: () => isSource && node.data.src === 'email' },
+  ];
+  const FIELDS = ALL_FIELDS.filter(f => f.always || (typeof f.if === 'function' && f.if()));
+
+  const [selected, setSelected] = useState(() => new Set(FIELDS.filter(f => f.always).map(f => f.id)));
+  const [format,   setFormat]   = useState('csv');
+  const [range,    setRange]    = useState('7d');
+
+  const toggle = (id) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center modal-backdrop"
+         style={{ background: 'rgba(15,23,42,0.45)' }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()}
+        className="modal-card w-[480px] max-w-[92vw] bg-white rounded-xl shadow-modal border border-line overflow-hidden">
+        {/* Header */}
+        <div className="px-5 pt-4 pb-3 flex items-center justify-between border-b border-line-soft">
+          <div className="flex items-center gap-2">
+            <span className="w-7 h-7 rounded-md bg-brand-soft text-brand inline-flex items-center justify-center"><Download size={14}/></span>
+            <h3 className="text-[14px] font-semibold text-ink">Export leads</h3>
+          </div>
+          <button onClick={onClose} className="text-ink-soft hover:text-ink transition-colors"><X size={14}/></button>
+        </div>
+
+        {/* Body */}
+        <div className="px-5 py-4 space-y-3 max-h-[70vh] overflow-y-auto scroll-thin">
+          <Field label="Date range">
+            <select value={range} onChange={(e) => setRange(e.target.value)}
+              className="w-full h-8 pl-2 pr-7 text-[12px] text-ink bg-surface-sub border border-line-soft rounded-md outline-none focus:border-brand">
+              <option value="today">Today</option>
+              <option value="7d">Last 7 days</option>
+              <option value="30d">Last 30 days</option>
+              <option value="90d">Last 90 days</option>
+              <option value="all">All time</option>
+            </select>
+          </Field>
+
+          <Field label="Format">
+            <div className="grid grid-cols-3 gap-2">
+              {['csv', 'xlsx', 'json'].map(f => (
+                <button key={f} onClick={() => setFormat(f)}
+                  className={`h-8 text-[11.5px] font-semibold rounded-md transition-colors ${
+                    format === f
+                      ? 'bg-brand-soft text-brand border border-brand/40'
+                      : 'bg-white text-ink-muted border border-line-soft hover:bg-surface-muted hover:text-ink'
+                  }`}>
+                  {f.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          </Field>
+
+          <Field label={`Fields (${selected.size}/${FIELDS.length})`} gap="loose">
+            <div className="grid grid-cols-2 gap-1.5">
+              {FIELDS.map(f => {
+                const checked = selected.has(f.id);
+                return (
+                  <label key={f.id}
+                    className="flex items-center gap-2 px-2 py-1.5 bg-surface-sub border border-line-soft rounded cursor-pointer hover:bg-surface-muted transition-colors">
+                    <input type="checkbox" checked={checked} onChange={() => toggle(f.id)}
+                      className="w-3.5 h-3.5 cursor-pointer accent-brand"/>
+                    <span className="text-[11.5px] text-ink">{f.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <button onClick={() => setSelected(new Set(FIELDS.map(f => f.id)))}
+                className="text-[10.5px] text-brand font-medium hover:underline">Select all</button>
+              <span className="text-ink-soft text-[10.5px]">·</span>
+              <button onClick={() => setSelected(new Set(FIELDS.filter(f => f.always).map(f => f.id)))}
+                className="text-[10.5px] text-ink-muted font-medium hover:underline">Reset to defaults</button>
+            </div>
+          </Field>
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-3 bg-surface-sub border-t border-line-soft flex items-center justify-between">
+          <span className="text-[11px] text-ink-soft">Exports are emailed when ready (large datasets).</span>
+          <div className="flex items-center gap-2">
+            <button onClick={onClose}
+              className="h-8 px-3 inline-flex items-center text-[12px] font-medium text-ink-muted bg-white border border-line rounded-md hover:bg-surface-muted hover:text-ink transition-colors">
+              Cancel
+            </button>
+            <button onClick={onClose}
+              className="h-8 px-3.5 inline-flex items-center gap-1.5 text-[12px] font-semibold text-white bg-genesis hover:bg-genesis-hover rounded-md transition-colors">
+              <Download size={12}/> Download
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function buildMockLeads(node) {
+  const SOURCES_NAMES = ['Facebook', 'Google', 'Email', 'Direct'];
+  const COUNTRIES = ['AU', 'US', 'GB', 'CA', 'DE', 'NZ', 'IN'];
+  const DEVICES = ['iPhone', 'Mac', 'Android', 'Windows'];
+  const FIRST = ['Sarah', 'Mike', 'Emma', 'James', 'Olivia', 'Noah', 'Ava', 'Liam'];
+  const LAST  = ['Chen', 'Smith', 'Patel', 'Johnson', 'Brown', 'Wilson', 'Davis'];
+  const TIMES = ['2m ago', '12m ago', '38m ago', '1h ago', '2h ago', '4h ago', '6h ago', '1d ago', '2d ago'];
+
+  const make = (i, opts = {}) => {
+    const fname = FIRST[i % FIRST.length];
+    const lname = LAST[i % LAST.length];
+    const name  = `${fname} ${lname}`;
+    const email = `${fname.toLowerCase()}@example.com`;
+    return {
+      name:    opts.named ? name : null,
+      email:   opts.captured ? email : null,
+      source:  SOURCES_NAMES[i % SOURCES_NAMES.length],
+      country: COUNTRIES[i % COUNTRIES.length],
+      device:  DEVICES[i % DEVICES.length],
+      time:    TIMES[i % TIMES.length],
+      order:   opts.checkout ? (29 + i * 12) : null,
+      branch:  opts.logic ? (i % 2 === 0 ? 'Y' : 'N') : null,
+      status:  opts.email ? (i % 3 === 0 ? 'Opened' : 'Sent') : null,
+    };
+  };
+
+  const isSource = node.type === 'source';
+  const isLogic  = node.type === 'logic';
+  const kind     = node.data.kind || node.data.pageType;
+
+  if (isSource && node.data.src === 'email')
+    return Array.from({ length: 7 }, (_, i) => make(i, { email: true, named: true, captured: true }));
+  if (isSource)
+    return Array.from({ length: 6 }, (_, i) => make(i)); // anonymous
+  if (isLogic)
+    return Array.from({ length: 6 }, (_, i) => make(i, { logic: true, captured: i % 2 === 0 }));
+  if (kind === 'checkout' || node.data.pageType === 'checkout')
+    return Array.from({ length: 5 }, (_, i) => make(i, { named: true, captured: true, checkout: true }));
+  if (kind === 'form' || node.data.pageType === 'form')
+    return Array.from({ length: 6 }, (_, i) => make(i, { named: true, captured: true }));
+  // Default page: mix of anonymous + captured
+  return Array.from({ length: 6 }, (_, i) => make(i, { captured: i < 3, named: i < 2 }));
 }
 
 /* InspectorSettings — V6 stub for now */
@@ -3307,22 +3960,127 @@ function InspectorSettings({ node, api }) {
   return (
     <div className="px-4 py-3 space-y-4">
       <InspSection label="General">
-        <Field label="Name">
-          <input value={title} onChange={(e) => api.updateNodeData(node.id, { title: e.target.value })}
-            className="w-full h-7 px-2 text-[11.5px] text-ink bg-surface-sub border border-line-soft rounded outline-none focus:border-brand"/>
+        {node.type !== 'logic' && (
+          <Field label="Name">
+            <input value={title} onChange={(e) => api.updateNodeData(node.id, { title: e.target.value })}
+              className="w-full h-7 px-2 text-[11.5px] text-ink bg-surface-sub border border-line-soft rounded outline-none focus:border-brand"/>
+          </Field>
+        )}
+        <Field label="Status">
+          <select value={node.data.status || 'draft'}
+            onChange={(e) => api.updateNodeData(node.id, { status: e.target.value })}
+            className="w-full h-7 pl-2 pr-7 text-[11.5px] text-ink bg-surface-sub border border-line-soft rounded outline-none focus:border-brand">
+            <option value="draft">Draft</option>
+            <option value="live">Live</option>
+            <option value="paused">Paused</option>
+          </select>
         </Field>
         {isPage && (
           <Field label="URL slug">
             <div className="flex items-center gap-1">
               <span className="text-[11px] text-ink-soft">/</span>
-              <input value={(node.data.path || '').replace(/^\//, '')} onChange={(e) => api.updateNodeData(node.id, { path: '/' + e.target.value })}
-                className="flex-1 h-7 px-2 text-[11.5px] text-ink bg-surface-sub border border-line-soft rounded outline-none focus:border-brand font-mono"/>
+              <input value={(node.data.path || '').replace(/^\//, '')}
+                onChange={(e) => api.updateNodeData(node.id, { path: '/' + e.target.value })}
+                disabled={node.data.pageType !== 'custom'}
+                title={node.data.pageType !== 'custom' ? 'URL is controlled by the linked Estage page. Switch type to Custom to edit.' : undefined}
+                className="flex-1 h-7 px-2 text-[11.5px] text-ink bg-surface-sub border border-line-soft rounded outline-none focus:border-brand font-mono disabled:opacity-60 disabled:cursor-not-allowed"/>
             </div>
           </Field>
         )}
       </InspSection>
 
       {isPage && (
+        <InspSection label="Page type">
+          <Field label="Type">
+            <select value={node.data.pageType || 'custom'} onChange={(e) => api.updateNodeData(node.id, { pageType: e.target.value })}
+              className="w-full h-7 px-2 text-[11.5px] text-ink bg-surface-sub border border-line-soft rounded outline-none focus:border-brand">
+              <option value="landing">Landing</option>
+              <option value="form">Lead form</option>
+              <option value="sales">Sales</option>
+              <option value="checkout">Checkout</option>
+              <option value="thanks">Thank you</option>
+              <option value="membership">Members</option>
+              <option value="webinar">Webinar</option>
+              <option value="upsell">Upsell</option>
+              <option value="custom">Custom…</option>
+            </select>
+          </Field>
+          <p className="text-[10.5px] text-ink-soft leading-snug -mt-1">
+            {node.data.pageType === 'custom'
+              ? 'Custom: edit icon, color, screenshot, and slug below.'
+              : 'Type-defined: icon, color, and URL come from the linked Estage page. Pick "Custom…" to override.'}
+          </p>
+        </InspSection>
+      )}
+
+      {isPage && ['checkout', 'upsell', 'sales'].includes(node.data.pageType) && (
+        <InspSection label="Pricing">
+          <Field label="Product name">
+            <input value={node.data.productName || ''}
+              onChange={(e) => api.updateNodeData(node.id, { productName: e.target.value })}
+              placeholder="e.g. Founding Member Plan"
+              className="w-full h-7 px-2 text-[11.5px] text-ink bg-surface-sub border border-line-soft rounded outline-none focus:border-brand"/>
+          </Field>
+          <Field label="Price">
+            <div className="flex items-center gap-1">
+              <select value={node.data.currency || 'USD'}
+                onChange={(e) => api.updateNodeData(node.id, { currency: e.target.value })}
+                className="h-7 pl-2 pr-6 text-[11.5px] text-ink bg-surface-sub border border-line-soft rounded outline-none focus:border-brand">
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+                <option value="GBP">GBP</option>
+                <option value="AUD">AUD</option>
+                <option value="CAD">CAD</option>
+              </select>
+              <input type="number" inputMode="decimal" min="0" step="0.01"
+                value={node.data.price != null ? node.data.price : ''}
+                onChange={(e) => api.updateNodeData(node.id, { price: e.target.value === '' ? null : parseFloat(e.target.value) })}
+                placeholder="0.00"
+                className="flex-1 h-7 px-2 text-[11.5px] text-ink bg-surface-sub border border-line-soft rounded outline-none focus:border-brand tabular-nums"/>
+            </div>
+          </Field>
+          <p className="text-[10.5px] text-ink-soft leading-snug">
+            Used for funnel-wide revenue, AOV, and ROI calculations. Multiple line items / order bumps coming soon.
+          </p>
+        </InspSection>
+      )}
+
+      {node.type === 'source' && (
+        <InspSection label="Source kind">
+          <Field label="Type">
+            <select value={node.data.sourceKind || 'paid'}
+              onChange={(e) => api.updateNodeData(node.id, { sourceKind: e.target.value })}
+              className="w-full h-7 pl-2 pr-7 text-[11.5px] text-ink bg-surface-sub border border-line-soft rounded outline-none focus:border-brand">
+              <option value="paid">Paid</option>
+              <option value="organic">Organic</option>
+              <option value="email">Email</option>
+              <option value="affiliate">Affiliate</option>
+              <option value="other">Other</option>
+            </select>
+          </Field>
+          {(node.data.sourceKind || 'paid') === 'paid' && (
+            <Field label="Cost (last 7d)">
+              <div className="flex items-center gap-1">
+                <select value={node.data.currency || 'USD'}
+                  onChange={(e) => api.updateNodeData(node.id, { currency: e.target.value })}
+                  className="h-7 pl-2 pr-6 text-[11.5px] text-ink bg-surface-sub border border-line-soft rounded outline-none focus:border-brand">
+                  <option value="USD">USD</option>
+                  <option value="EUR">EUR</option>
+                  <option value="GBP">GBP</option>
+                  <option value="AUD">AUD</option>
+                </select>
+                <input type="number" inputMode="decimal" min="0" step="1"
+                  value={node.data.cost != null ? node.data.cost : ''}
+                  onChange={(e) => api.updateNodeData(node.id, { cost: e.target.value === '' ? null : parseFloat(e.target.value) })}
+                  placeholder="0"
+                  className="flex-1 h-7 px-2 text-[11.5px] text-ink bg-surface-sub border border-line-soft rounded outline-none focus:border-brand tabular-nums"/>
+              </div>
+            </Field>
+          )}
+        </InspSection>
+      )}
+
+      {isPage && node.data.pageType === 'custom' && (
         <InspSection label="Appearance">
           <Field label="Icon">
             <div className="grid grid-cols-8 gap-1">
@@ -3365,8 +4123,8 @@ function InspectorSettings({ node, api }) {
       )}
 
       <InspSection label="Tracking">
-        <Toggle label="Track conversions" defaultOn/>
-        <Toggle label="Send to analytics" defaultOn/>
+        <Toggle label="Track conversions" defaultOn={!(node.type === 'source' && node.data.src === 'custom')}/>
+        <Toggle label="Send to analytics" defaultOn={!(node.type === 'source' && node.data.src === 'custom')}/>
         <Toggle label="Notify on visit" />
       </InspSection>
     </div>
@@ -3405,11 +4163,13 @@ function Row({ k, v }) {
   );
 }
 
-function Field({ label, children }) {
+function Field({ label, children, gap = 'tight' }) {
+  // gap: 'tight' (none) for plain inputs; 'loose' (8px) for stacked cards (Connect rows).
+  const space = gap === 'loose' ? 'space-y-2' : '';
   return (
     <div>
       <div className="text-[11px] text-ink-soft mb-1">{label}</div>
-      {children}
+      <div className={space}>{children}</div>
     </div>
   );
 }
@@ -3477,16 +4237,84 @@ function SuggestedWin({ title, body, impact, cta }) {
   );
 }
 
-function InspectorEmpty({ funnel }) {
-  /* Empty-state Inspector: shown when no canvas card is selected.
-     Acts as funnel-level overview — analytics summary + activity feed.
-     Updates whenever the user clicks empty space (deselects). */
-  const stats = [
-    { label: 'Visits',    value: '3,214', delta: '+12%', good: true,  Icon: Globe },
-    { label: 'Submits',   value: '271',   delta: '+8%',  good: true,  Icon: Check },
-    { label: 'Conv',      value: '8.4%',  delta: '−2.1%',good: false, Icon: TrendingUp },
-    { label: 'Revenue',   value: '$2.9k', delta: '+18%', good: true,  Icon: DollarSign },
+function InspectorEmpty({ funnel, canvasNodes = [] }) {
+  /* Funnel overview — date range + Basic/Advanced toggle.
+     Advanced (revenue/AOV/CPA/ROI) auto-unlocks only when the funnel has at
+     least one priced checkout-class card OR at least one paid source with cost. */
+  const [range, setRange]       = useState('7d');
+  const [view,  setView]        = useState('basic'); // 'basic' | 'advanced'
+  const [customRangeOpen, setCustomRangeOpen] = useState(false);
+
+  // Detect what's actually in the funnel — drives whether Advanced is unlockable.
+  const pricedPages = useMemo(
+    () => canvasNodes.filter(n => n.type === 'page'
+      && ['checkout', 'upsell', 'sales'].includes(n.data.pageType)
+      && typeof n.data.price === 'number' && n.data.price > 0),
+    [canvasNodes]
+  );
+  const paidSources = useMemo(
+    () => canvasNodes.filter(n => n.type === 'source'
+      && (n.data.sourceKind === 'paid' || n.data.sourceKind === undefined)
+      && typeof n.data.cost === 'number' && n.data.cost > 0),
+    [canvasNodes]
+  );
+  const canShowAdvanced = pricedPages.length > 0 || paidSources.length > 0;
+  // If user previously selected advanced but conditions changed, snap back.
+  useEffect(() => {
+    if (view === 'advanced' && !canShowAdvanced) setView('basic');
+  }, [canShowAdvanced, view]);
+
+  // Compute basic stats (visits/conversions) from canvas data.
+  const totalVisits = useMemo(
+    () => canvasNodes.filter(n => n.type === 'source')
+      .reduce((sum, n) => sum + (n.data.visitorsNum || 0), 0),
+    [canvasNodes]
+  );
+  const totalSubmits = useMemo(
+    () => canvasNodes.filter(n => n.type === 'page' && (n.data.pageType === 'form' || n.data.pageType === 'thanks'))
+      .reduce((sum, n) => sum + (n.data.conversions || 0), 0),
+    [canvasNodes]
+  );
+  const convPct = totalVisits ? ((totalSubmits / totalVisits) * 100).toFixed(1) : '0.0';
+  const dropPct = totalVisits ? Math.max(0, 100 - parseFloat(convPct)).toFixed(1) : '0.0';
+
+  // Compute advanced stats from priced pages + paid sources.
+  const revenue = useMemo(
+    () => pricedPages.reduce((sum, n) => sum + ((n.data.price || 0) * (n.data.conversions || 0)), 0),
+    [pricedPages]
+  );
+  const totalCost = useMemo(
+    () => paidSources.reduce((sum, n) => sum + (n.data.cost || 0), 0),
+    [paidSources]
+  );
+  const totalOrders = useMemo(
+    () => pricedPages.reduce((sum, n) => sum + (n.data.conversions || 0), 0),
+    [pricedPages]
+  );
+  const aov = totalOrders ? (revenue / totalOrders) : 0;
+  const cpa = totalOrders && totalCost ? (totalCost / totalOrders) : 0;
+  const roi = totalCost ? (revenue / totalCost) : 0;
+
+  const fmtMoney = (n) => '$' + (n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : n.toFixed(2));
+
+  const basicStats = [
+    { label: 'Visits',          value: totalVisits.toLocaleString(), delta: '+12%',  good: true,  Icon: Globe,        color: '#006CB5' },
+    { label: 'Unique visitors', value: Math.round(totalVisits * 0.78).toLocaleString(), delta: '+9%',   good: true,  Icon: Eye,          color: '#0891B2' },
+    { label: 'Conversions',     value: totalSubmits.toLocaleString(),delta: '+8%',   good: true,  Icon: Check,        color: '#10B981' },
+    { label: 'Conv rate',       value: convPct + '%',                delta: '−2.1%', good: false, Icon: TrendingUp,   color: '#7C3AED' },
+    { label: 'Drop-off',        value: dropPct + '%',                delta: '−1%',   good: true,  Icon: Activity,     color: '#475569' },
+    { label: 'Avg time',        value: '1m 24s',                     delta: '+4s',   good: true,  Icon: Eye,          color: '#0D9488' },
   ];
+  const advStats = [
+    ...basicStats,
+    { label: 'Revenue',   value: fmtMoney(revenue),    delta: '+18%',  good: true,  Icon: DollarSign,   color: '#059669' },
+    { label: 'Orders',    value: totalOrders.toLocaleString(), delta: '+12%', good: true, Icon: Tag, color: '#F59E0B' },
+    { label: 'Avg order', value: fmtMoney(aov),        delta: '+3%',   good: true,  Icon: Tag,          color: '#F59E0B' },
+    { label: 'Cost',      value: fmtMoney(totalCost),  delta: '−5%',   good: true,  Icon: Activity,     color: '#475569' },
+    { label: 'CPA',       value: fmtMoney(cpa),        delta: '−5%',   good: true,  Icon: Activity,     color: '#475569' },
+    { label: 'ROI',       value: roi.toFixed(1) + '×', delta: '+0.7×', good: true,  Icon: TrendingUp,   color: '#0D9488' },
+  ];
+  const stats = view === 'advanced' && canShowAdvanced ? advStats : basicStats;
   const activity = [
     { color: '#10B981', icon: <Check    size={11}/>, text: <>Funnel <span className="font-medium">published</span></>,                                           time: '2m ago' },
     { color: '#EA4335', icon: <Mail     size={11}/>, text: <>New email step added to <span className="font-medium">Lead form</span></>,                          time: '24m ago' },
@@ -3502,22 +4330,52 @@ function InspectorEmpty({ funnel }) {
       <div className="px-4 py-3 border-b border-line-soft shrink-0">
         <div className="text-[10.5px] font-semibold uppercase tracking-wider text-ink-soft">Funnel overview</div>
         <div className="text-[13px] font-semibold text-ink mt-0.5 truncate">{funnel?.name || 'Untitled funnel'}</div>
-        <div className="text-[10.5px] text-ink-soft mt-0.5 inline-flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-good live-dot"/> Last 7 days
+
+        <div className="mt-2 flex items-center gap-1.5">
+          {/* Date range */}
+          <select value={range} onChange={(e) => setRange(e.target.value)}
+            className="h-6 pl-2 pr-6 text-[10.5px] text-ink bg-surface-sub border border-line-soft rounded outline-none focus:border-brand">
+            <option value="today">Today</option>
+            <option value="7d">Last 7 days</option>
+            <option value="30d">Last 30 days</option>
+            <option value="all">All time</option>
+            <option value="custom">Custom range…</option>
+          </select>
+          <span className="flex-1"/>
+          {/* Basic / Advanced toggle */}
+          <div className="inline-flex items-center bg-surface-muted border border-line-soft rounded-md p-0.5 gap-0.5">
+            <button onClick={() => setView('basic')}
+              className={`h-5 px-1.5 text-[10.5px] font-medium rounded transition-colors ${view === 'basic' ? 'bg-white text-ink shadow-xs' : 'text-ink-soft hover:text-ink'}`}>
+              Basic
+            </button>
+            <button onClick={() => canShowAdvanced && setView('advanced')}
+              disabled={!canShowAdvanced}
+              title={canShowAdvanced ? '' : 'Add pricing to a checkout, or cost to a paid source, to enable Advanced.'}
+              className={`h-5 px-1.5 text-[10.5px] font-medium rounded transition-colors ${
+                view === 'advanced' ? 'bg-white text-ink shadow-xs'
+                : canShowAdvanced ? 'text-ink-soft hover:text-ink'
+                : 'text-ink-whisper cursor-not-allowed'
+              }`}>
+              Advanced
+            </button>
+          </div>
         </div>
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto scroll-thin">
-        {/* Stats grid (2x2) */}
+        {/* Stats grid — 8 stats, 2 cols, white cards with category-colored icon chips */}
         <div className="px-4 py-3 grid grid-cols-2 gap-2">
           {stats.map((s, i) => (
-            <div key={i} className="bg-surface-sub border border-line-soft rounded-md px-2.5 py-2">
+            <div key={i} className="bg-white border border-line-soft rounded-md px-2.5 py-2 hover:border-line-strong transition-colors">
               <div className="flex items-center justify-between">
-                <s.Icon size={12} className="text-ink-soft"/>
+                <span className="w-5 h-5 rounded inline-flex items-center justify-center"
+                  style={{ background: s.color + '1a', color: s.color }}>
+                  <s.Icon size={11}/>
+                </span>
                 <span className={`text-[10px] font-semibold tabular-nums ${s.good ? 'text-good-deep' : 'text-bad-deep'}`}>{s.delta}</span>
               </div>
-              <div className="text-[15px] font-semibold text-ink tabular-nums mt-1">{s.value}</div>
-              <div className="text-[10.5px] text-ink-soft mt-0.5">{s.label}</div>
+              <div className="text-[15px] font-semibold text-ink tabular-nums mt-1.5 leading-none">{s.value}</div>
+              <div className="text-[10.5px] text-ink-soft mt-1 leading-none">{s.label}</div>
             </div>
           ))}
         </div>
@@ -3553,22 +4411,327 @@ function InspectorEmpty({ funnel }) {
   );
 }
 
+
+/* Toast system — shows brief confirmation messages in the bottom-center.
+   Auto-dismisses after 1800ms. Provider in App, useToast hook anywhere. */
+const ToastContext = React.createContext(() => {});
+function useToast() { return React.useContext(ToastContext); }
+
+function ToastViewport({ toast }) {
+  if (!toast) return null;
+  return (
+    <div className="fixed left-1/2 -translate-x-1/2 bottom-6 z-50 pointer-events-none"
+         style={{ animation: 'tipIn 160ms ease-out' }}>
+      <div className="inline-flex items-center gap-2 px-3.5 py-2 bg-ink text-white rounded-md shadow-tip text-[12.5px] font-medium">
+        {toast.kind === 'success' && (
+          <span className="w-4 h-4 rounded-full bg-good inline-flex items-center justify-center">
+            <Check size={10} className="text-white"/>
+          </span>
+        )}
+        {toast.kind === 'error' && (
+          <span className="w-4 h-4 rounded-full bg-bad inline-flex items-center justify-center text-white text-[10px] font-bold">!</span>
+        )}
+        {toast.message}
+      </div>
+    </div>
+  );
+}
+
+
+/* OptimiseTestsPanel — bottom-right floating panel showing active and
+   suggested A/B tests. Compact, collapsible, doesn't fight canvas controls. */
+function OptimiseTestsPanel() {
+  const [open, setOpen] = useState(true);
+  const ACTIVE = [
+    { name: 'Hero headline · v2', card: 'Landing Page',     daysLeft: 4, lift: '+8%' },
+    { name: 'Pricing layout',     card: 'Sales Page',       daysLeft: 9, lift: '+3%' },
+    { name: 'Form length',        card: 'Lead Magnet Form', daysLeft: 2, lift: '+11%' },
+  ];
+  const SUGGESTED = [
+    { name: 'A/B test the CTA color',  card: 'Landing Page',     impact: 'Med', why: 'Below benchmark conversion' },
+    { name: 'Add testimonials block',  card: 'Sales Page',       impact: 'High', why: 'Funnels with social proof lift 22% median' },
+  ];
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)}
+        className="absolute right-4 bottom-4 z-30 inline-flex items-center gap-2 h-9 px-3 rounded-md bg-white border border-line shadow-card hover:shadow-menu transition-shadow">
+        <span className="w-5 h-5 rounded inline-flex items-center justify-center bg-violet-soft text-violet ai-ripple">
+          <Spark size={11} className="ai-breathe-icon"/>
+        </span>
+        <span className="text-[12px] font-semibold text-ink">Tests</span>
+        <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-violet text-white text-[10px] font-bold tabular-nums">{ACTIVE.length}</span>
+      </button>
+    );
+  }
+  return (
+    <div className="absolute right-4 bottom-4 z-30 w-[320px] bg-white rounded-md border border-line shadow-card flex flex-col overflow-hidden">
+      <div className="px-3 py-2 border-b border-line-soft flex items-center justify-between bg-surface-sub">
+        <div className="flex items-center gap-2">
+          <span className="w-5 h-5 rounded inline-flex items-center justify-center bg-violet-soft text-violet ai-ripple">
+            <Spark size={11} className="ai-breathe-icon"/>
+          </span>
+          <div className="text-[12px] font-semibold text-ink">Tests</div>
+          <span className="text-[10.5px] text-ink-soft">{ACTIVE.length} active · {SUGGESTED.length} suggested</span>
+        </div>
+        <button onClick={() => setOpen(false)} className="text-ink-soft hover:text-ink transition-colors"><X size={12}/></button>
+      </div>
+
+      <div className="flex-1 max-h-[340px] overflow-y-auto scroll-thin">
+        <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-soft">Active</div>
+        {ACTIVE.map((t, i) => (
+          <div key={i} className="px-3 py-2 hover:bg-surface-sub transition-colors cursor-pointer">
+            <div className="flex items-center justify-between">
+              <div className="text-[12px] font-medium text-ink truncate">{t.name}</div>
+              <span className="text-[10px] font-semibold tabular-nums text-good-deep shrink-0 ml-2">{t.lift}</span>
+            </div>
+            <div className="text-[10.5px] text-ink-soft mt-0.5 flex items-center gap-1.5">
+              <span className="truncate">on {t.card}</span>
+              <span>·</span>
+              <span>{t.daysLeft}d left</span>
+            </div>
+          </div>
+        ))}
+        <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-soft border-t border-line-soft">Suggested</div>
+        {SUGGESTED.map((t, i) => (
+          <div key={i} className="px-3 py-2 hover:bg-surface-sub transition-colors cursor-pointer">
+            <div className="flex items-center justify-between">
+              <div className="text-[12px] font-medium text-ink truncate">{t.name}</div>
+              <span className={`text-[10px] font-semibold rounded px-1.5 py-px shrink-0 ml-2 ${
+                t.impact === 'High' ? 'bg-good-soft text-good-deep' : 'bg-warn-soft text-warn-deep'
+              }`}>{t.impact}</span>
+            </div>
+            <div className="text-[10.5px] text-ink-soft mt-0.5 flex items-center gap-1.5">
+              <span className="truncate">on {t.card}</span>
+            </div>
+            <div className="text-[10.5px] text-ink-soft mt-0.5 truncate italic">{t.why}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="px-3 py-2 border-t border-line-soft bg-surface-sub flex items-center justify-between">
+        <span className="text-[10.5px] text-ink-soft">Updated 4m ago</span>
+        <button className="h-6 px-2 text-[11px] font-semibold text-violet hover:bg-violet-soft rounded transition-colors">Run AI audit</button>
+      </div>
+    </div>
+  );
+}
+
+
+/* OptimiseSuggestionModal — bottom-centred panel detail for a card-level
+   AI suggestion. Styling mirrors AIPopover (rounded card, violet accent,
+   chips for badges). z-[9990] so it sits above ZoomControls. */
+function OptimiseSuggestionModal({ open, nodeTitle, onClose }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[9990] flex items-end justify-center pb-8 bg-ink/15"
+         onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()}
+        className="ctx-menu w-[560px] max-w-[92vw] bg-white rounded-lg shadow-menu border border-line overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-line-soft">
+          <span className="w-7 h-7 rounded-md bg-violet-soft text-violet flex items-center justify-center ai-ripple">
+            <Spark size={14} className="ai-breathe-icon"/>
+          </span>
+          <div className="flex-1 min-w-0">
+            <div className="text-[13px] font-semibold text-ink leading-tight">A/B test the headline</div>
+            <div className="text-[10.5px] text-ink-soft mt-0.5 truncate">on {nodeTitle || 'page'}</div>
+          </div>
+          <Chip kind="good" sm>+14% likely</Chip>
+          <button onClick={onClose}
+            className="w-6 h-6 inline-flex items-center justify-center rounded hover:bg-surface-sub text-ink-soft transition-colors ml-1">
+            <X size={13}/>
+          </button>
+        </div>
+        {/* Body */}
+        <div className="px-4 py-3 grid grid-cols-3 gap-4">
+          {/* Hypothesis + reasoning */}
+          <div className="col-span-2">
+            <div className="text-[10.5px] font-semibold uppercase tracking-wider text-ink-soft mb-1">Hypothesis</div>
+            <div className="text-[12.5px] text-ink leading-snug mb-3">
+              The hero headline hasn't been changed in 30 days. Funnels that A/B test their hero copy see a median lift of <span className="font-semibold tabular-nums">+14%</span> within 14 days.
+            </div>
+            <div className="text-[10.5px] font-semibold uppercase tracking-wider text-ink-soft mb-1">Suggested variants</div>
+            <ul className="text-[12px] text-ink leading-snug space-y-1">
+              <li>· Lead with benefit: <span className="font-medium">"Get your first 100 leads in 7 days"</span></li>
+              <li>· Lead with social proof: <span className="font-medium">"Join 2,400+ marketers using this funnel"</span></li>
+            </ul>
+          </div>
+          {/* Sidebar — confidence + time */}
+          <div className="space-y-2">
+            <div>
+              <div className="text-[10.5px] font-semibold uppercase tracking-wider text-ink-soft mb-1">Confidence</div>
+              <div className="flex items-center gap-1.5">
+                <div className="flex-1 h-1.5 bg-surface-muted rounded-full overflow-hidden">
+                  <div className="h-full bg-violet" style={{ width: '78%' }}/>
+                </div>
+                <span className="text-[11px] font-semibold tabular-nums text-ink">78%</span>
+              </div>
+            </div>
+            <div>
+              <div className="text-[10.5px] font-semibold uppercase tracking-wider text-ink-soft mb-1">Time to significance</div>
+              <div className="text-[12px] text-ink font-medium">~9 days</div>
+            </div>
+            <div>
+              <div className="text-[10.5px] font-semibold uppercase tracking-wider text-ink-soft mb-1">Sample size</div>
+              <div className="text-[12px] text-ink font-medium tabular-nums">~ 1,400 visitors</div>
+            </div>
+          </div>
+        </div>
+        {/* Footer */}
+        <div className="px-4 py-3 bg-surface-sub border-t border-line-soft flex items-center justify-end gap-2">
+          <button onClick={onClose}
+            className="h-8 px-3 text-[12px] font-medium text-ink-soft hover:text-ink transition-colors">
+            Dismiss
+          </button>
+          <button onClick={onClose}
+            className="h-8 px-3.5 inline-flex items-center gap-1.5 text-[12px] font-semibold text-white bg-violet hover:bg-violet-deep rounded-md transition-colors">
+            <Spark size={12}/> Start test
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+
+/* NewFunnelStarter — first-step modal when user clicks "+ New funnel".
+   Choice between picking a template (gallery) or building from scratch.
+   Same modal-card animation system as the FunnelActionModal. */
+function NewFunnelStarter({ onClose, onPickTemplate, onScratch }) {
+  const TEMPLATES = [
+    { id:'lead',     name:'Lead Magnet',     pages:3, blurb:'Capture emails with a free download.', accent:'#006CB5' },
+    { id:'webinar',  name:'Webinar',         pages:5, blurb:'Registration → live → replay → offer.',  accent:'#7C3AED' },
+    { id:'sales',    name:'Sales Funnel',    pages:6, blurb:'Sales page → checkout → upsell → thanks.',accent:'#10B981' },
+    { id:'tripwire', name:'Tripwire',        pages:4, blurb:'Low-cost offer → upsell ladder.',         accent:'#F59E0B' },
+    { id:'launch',   name:'Product Launch',  pages:7, blurb:'Pre-launch → launch → cart-close.',       accent:'#DC2626' },
+    { id:'sas',      name:'SaaS Free Trial', pages:5, blurb:'Landing → signup → onboarding → upgrade.', accent:'#0891B2' },
+  ];
+  return (
+    <div className="fixed inset-0 z-[9985] flex items-center justify-center modal-backdrop"
+         style={{ background: 'rgba(15,23,42,0.45)' }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()}
+        className="modal-card w-[720px] max-w-[92vw] bg-white rounded-xl shadow-modal border border-line overflow-hidden">
+        {/* Header */}
+        <div className="px-5 pt-4 pb-3 flex items-center justify-between border-b border-line-soft">
+          <div>
+            <h3 className="text-[15px] font-semibold text-ink">Start a new funnel</h3>
+            <p className="text-[11.5px] text-ink-soft mt-0.5">Pick a starting template or build from scratch.</p>
+          </div>
+          <button onClick={onClose} className="text-ink-soft hover:text-ink transition-colors"><X size={14}/></button>
+        </div>
+
+        {/* Templates grid */}
+        <div className="px-5 py-4 grid grid-cols-3 gap-3 max-h-[60vh] overflow-y-auto scroll-thin">
+          {TEMPLATES.map(t => (
+            <button key={t.id} onClick={() => onPickTemplate(t)}
+              className="group/tpl text-left bg-white border border-line-soft rounded-md p-3 hover:border-brand hover:shadow-card transition-all">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="w-7 h-7 rounded-md inline-flex items-center justify-center"
+                  style={{ background: t.accent + '1a', color: t.accent }}>
+                  <Workflow size={13}/>
+                </span>
+                <div className="text-[12.5px] font-semibold text-ink truncate flex-1 min-w-0">{t.name}</div>
+              </div>
+              <div className="text-[10.5px] text-ink-soft mb-2">{t.pages} pages</div>
+              <div className="text-[11.5px] text-ink-muted leading-snug">{t.blurb}</div>
+            </button>
+          ))}
+        </div>
+
+        {/* Footer — build from scratch */}
+        <div className="px-5 py-3 bg-surface-sub border-t border-line-soft flex items-center justify-between">
+          <span className="text-[11.5px] text-ink-soft">Or skip templates entirely.</span>
+          <div className="flex items-center gap-2">
+            <button onClick={onClose}
+              className="h-8 px-3 inline-flex items-center text-[12px] font-medium text-ink-muted bg-white border border-line rounded-md hover:bg-surface-muted hover:text-ink transition-colors">
+              Cancel
+            </button>
+            <button onClick={onScratch}
+              className="h-8 px-3.5 inline-flex items-center gap-1.5 text-[12px] font-semibold text-white bg-genesis hover:bg-genesis-hover rounded-md transition-colors">
+              <Plus size={12}/> Build from scratch
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+
+/* ExportFunnelButton — top-left of canvas. Opens a popover offering PNG / PDF
+   / HTML download. UI only — no actual export wired (placeholders log to
+   console). Sits at z-30 alongside ZoomControls. */
+function ExportFunnelButton() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="absolute left-4 top-4 z-30">
+      <button onClick={() => setOpen(o => !o)}
+        title="Export funnel"
+        className="inline-flex items-center gap-1.5 h-8 px-2.5 bg-white border border-line rounded-md shadow-xs text-[11.5px] font-medium text-ink-muted hover:text-ink hover:bg-surface-sub transition-colors">
+        <Download size={12}/> Export
+        <ChevronDown size={9} strokeWidth={2}/>
+      </button>
+      {open && (
+        <div className="ctx-menu absolute left-0 top-full mt-1 w-[180px] bg-white rounded-md border border-line shadow-menu p-1 z-50"
+             onClick={(e) => e.stopPropagation()}>
+          <button onClick={() => { console.log('[Export] PNG'); setOpen(false); }}
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-surface-sub text-[12px] text-ink transition-colors">
+            <FileIcon size={12} className="text-ink-soft"/> Download as PNG
+          </button>
+          <button onClick={() => { console.log('[Export] PDF'); setOpen(false); }}
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-surface-sub text-[12px] text-ink transition-colors">
+            <FileIcon size={12} className="text-ink-soft"/> Download as PDF
+          </button>
+          <button onClick={() => { console.log('[Export] HTML'); setOpen(false); }}
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-surface-sub text-[12px] text-ink transition-colors">
+            <FileIcon size={12} className="text-ink-soft"/> Download as HTML
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 export default function App() {
   const [aiOpen, setAiOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [focusSection, setFocusSection] = useState(null);
+  const [toast, setToast] = useState(null); // { message, kind } | null
+  const showToast = (message, kind = 'success') => {
+    setToast({ message, kind });
+    setTimeout(() => setToast(null), 1800);
+  };
+  // Optimise suggestion modal — listens to "open-suggestion" CustomEvents
+  // dispatched from the sparkle buttons on canvas cards.
+  const [suggestion, setSuggestion] = useState(null);
+  useEffect(() => {
+    const handler = (e) => setSuggestion(e.detail || {});
+    window.addEventListener('open-suggestion', handler);
+    return () => window.removeEventListener('open-suggestion', handler);
+  }, []);
+  useEffect(() => {
+    const handler = () => setNewFunnelOpen(true);
+    window.addEventListener('open-new-funnel', handler);
+    return () => window.removeEventListener('open-new-funnel', handler);
+  }, []);
   const [project, setProject] = useState(PROJECTS[0]);
   const [funnel, setFunnel] = useState(FUNNELS[0]);
   const [mode, setMode] = useState('build');
   const [templateModal, setTemplateModal] = useState(null);
   const [demoState, setDemoState] = useState('empty');
   const [selectedNode, setSelectedNode] = useState(null);
+  const [canvasNodes, setCanvasNodes] = useState([]);
+  const [newFunnelOpen, setNewFunnelOpen] = useState(false);
   /* ref-based imperative API exposed by Canvas for the Inspector to call (rename,
      remove, duplicate, deselect). Canvas owns nodes/edges; Inspector mutates
      through this so there's a single source of truth. */
   const canvasApi = useRef(null);
 
   return (
+    <ToastContext.Provider value={showToast}>
     <div className="h-screen flex flex-col bg-white">
       <TopbarWired project={project} onProjectChange={setProject} mode={mode} onModeChange={setMode}/>
       <ContextBar funnel={funnel} onFunnelChange={setFunnel} mode={mode}/>
@@ -3580,8 +4743,10 @@ export default function App() {
           focusSection={focusSection}
           onFocusSection={setFocusSection}
           onTemplateClick={setTemplateModal}
-          canvasApi={canvasApi}/>
+          canvasApi={canvasApi}
+          canvasNodes={canvasNodes}/>
         <Canvas
+          onNodesChange={setCanvasNodes}
           mode={mode}
           demoState={demoState}
           onDemoStateChange={setDemoState}
@@ -3591,11 +4756,15 @@ export default function App() {
           canvasApiRef={canvasApi}/>
         {selectedNode
           ? <Inspector node={selectedNode} api={canvasApi.current || {}} mode={mode}/>
-          : <InspectorEmpty funnel={funnel}/>}
+          : <InspectorEmpty funnel={funnel} canvasNodes={canvasNodes}/>}
       </div>
       <AIPopover open={aiOpen} onClose={() => setAiOpen(false)}/>
       <TemplateModal template={templateModal} onClose={() => setTemplateModal(null)} onConfirm={() => {}}/>
+      <OptimiseSuggestionModal open={!!suggestion} nodeTitle={suggestion?.title} onClose={() => setSuggestion(null)}/>
+      {newFunnelOpen && <NewFunnelStarter onClose={() => setNewFunnelOpen(false)} onPickTemplate={(t) => { setTemplateModal(t); setNewFunnelOpen(false); }} onScratch={() => setNewFunnelOpen(false)}/>}
+      <ToastViewport toast={toast}/>
     </div>
+    </ToastContext.Provider>
   );
 }
 
