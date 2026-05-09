@@ -2123,252 +2123,145 @@ function LogicNode({ node, selected, onSelect, onDragStart, onConnectStart, onRe
 /* getFloatingAnchor — given a node and a "look toward" point, returns the side
    anchor + outward-direction unit vector for that side. */
 function getFloatingAnchor(node, towardX, towardY, mode, isOutgoing) {
-  /* Canvas grammar: ALL cards use strict left-in / right-out anchors.
-     - Outgoing edges always exit the right-middle of the source card
-     - Incoming edges always enter the left-middle of the destination card
-     This makes the directional flow read consistently L→R across the canvas
-     and prevents the pile-ups that happened when multiple edges all picked
-     the same "facing" side. The `towardX/towardY` args are kept in the
-     signature for API compatibility but no longer drive side selection.
+  /* Bezier-era floating anchor — restored.
 
-     Source nodes don't have inputs (no leads come INTO a source) so this
-     is moot for them — they're always the `a` (outgoing) endpoint. */
+     Each endpoint picks the side of the card facing the other endpoint, so
+     edges emerge from whichever side reduces overall curvature. This pairs
+     with cubic bezier routing: control points sit `dist` away from each
+     anchor along its facing direction.
+
+     Logic nodes: OUTGOING edges always anchor at right-middle (where the
+     connector dot sits) so Y and N branches share a visible origin point.
+     INCOMING edges still use floating anchor logic so they don't all pile
+     onto one side. */
   const w = NODE_W[node.type];
   const h = getNodeH(node, mode);
+  const cx = node.x + w / 2;
   const cy = node.y + h / 2;
-  if (isOutgoing) {
-    /* exit right-middle */
+  if (node.type === 'logic' && isOutgoing) {
     return { x: node.x + w, y: cy, ox: 1, oy: 0 };
   }
-  /* enter left-middle */
-  return { x: node.x, y: cy, ox: -1, oy: 0 };
+  const dx = towardX - cx;
+  const dy = towardY - cy;
+  /* pick dominant axis to determine which side faces toward */
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return dx >= 0
+      ? { x: node.x + w, y: cy,         ox:  1, oy:  0 }
+      : { x: node.x,     y: cy,         ox: -1, oy:  0 };
+  } else {
+    return dy >= 0
+      ? { x: cx,         y: node.y + h, ox:  0, oy:  1 }
+      : { x: cx,         y: node.y,     ox:  0, oy: -1 };
+  }
 }
 
 function computeEdgeGeometry(a, b, allNodes, mode, edge) {
-  /* Smart orthogonal routing — right-angle paths that detour around blocking
-     cards instead of cutting through them.
+  /* Cubic bezier routing — restored from batch 18.
 
-     Path strategy:
-       FORWARD case (source x < destination x — typical L→R flow):
-         1. Exit source right-middle, go right STUB px
-         2. Find a clear vertical-run column between source and destination
-            that doesn't cut through any non-endpoint card
-         3. Vertical run up/down to destination's Y
-         4. Horizontal to destination left-middle
+     For each endpoint we pick a "floating anchor" — the side of the card facing
+     the other node's center, so edges emerge from whichever side reduces overall
+     curvature. Control points sit `dist` away from each anchor along its facing
+     direction; the resulting cubic bezier curves smoothly from source → target.
 
-       LOOP-BACK case (source x >= destination x — backwards flow, e.g.
-       a condition feeding a card on its left):
-         1. Exit source right-middle, go right STUB px
-         2. Go up OR down, clearing the entire row of cards
-         3. Travel left ABOVE/BELOW the card row
-         4. Drop down (or up) and turn right into destination's left-middle
+     Branched edges (yes/no/a/b) shift the source-side cy1 up or down by 45px so
+     two branches leaving the same logic-node connector visibly fan apart.
 
-     For branched edges (Y/N or A/B), the source side is offset vertically
-     by BRANCH_OFFSET so the two branches visibly fan apart.
+     Obstacle avoidance: sample the bezier at 12 points; if any sample falls
+     inside a non-source/non-target card's bbox (with 12px padding), lift cy1/cy2
+     above (or below) the obstacle stack. Re-detect after each lift; up to 3
+     passes. Direction (above/below) is chosen on the first pass from endpoint
+     geometry to prevent oscillation.
 
-     If there's no clear horizontal stub for the pill, the pill HIDES rather
-     than render in a broken spot. */
+     Output: path string + sx/sy/ex/ey, control points cx1/cy1/cx2/cy2, midpoint
+     mx/my (t=0.5), badge anchor bx/by (t=0.85), arrow tangent ang. */
 
-  const sx = a.x + NODE_W[a.type];
-  const sy = a.y + getNodeH(a, mode) / 2;
-  const ex = b.x;
-  const ey = b.y + getNodeH(b, mode) / 2;
+  /* anchors — `a` is source (outgoing), `b` is destination (incoming) */
+  const bCx = b.x + NODE_W[b.type] / 2;
+  const bCy = b.y + getNodeH(b, mode) / 2;
+  const aA = getFloatingAnchor(a, bCx, bCy, mode, true);
+  const aCx = a.x + NODE_W[a.type] / 2;
+  const aCy = a.y + getNodeH(a, mode) / 2;
+  const bA = getFloatingAnchor(b, aCx, aCy, mode, false);
 
-  /* Branch offset — Y/A goes up at the source, N/B goes down. */
-  const BRANCH_OFFSET = 22;
-  let sourceY = sy;
-  if (edge && edge.branch) {
-    if (edge.branch === 'yes' || edge.branch === 'a') sourceY = sy - BRANCH_OFFSET;
-    if (edge.branch === 'no'  || edge.branch === 'b') sourceY = sy + BRANCH_OFFSET;
+  const sx = aA.x, sy = aA.y;
+  const ex = bA.x, ey = bA.y;
+  /* control point distance — straighter curves, min 80 to avoid over-arcing
+     short edges; 0.5 of edge length for longer ones */
+  const dist = Math.max(80, Math.hypot(ex - sx, ey - sy) * 0.5);
+  let cx1 = sx + aA.ox * dist;
+  let cy1 = sy + aA.oy * dist;
+  let cx2 = ex + bA.ox * dist;
+  let cy2 = ey + bA.oy * dist;
+
+  /* Branch emergence — for branched edges leaving a horizontal anchor, push the
+     source-side control point up (yes/a) or down (no/b) by 45px. Both branches
+     stay violet; the visible fan-out comes entirely from this offset. */
+  if (edge && edge.branch && Math.abs(aA.ox) > Math.abs(aA.oy)) {
+    if (edge.branch === 'yes' || edge.branch === 'a') cy1 -= 45;
+    if (edge.branch === 'no'  || edge.branch === 'b') cy1 += 45;
   }
 
-  const STUB = 30;
-  const CORNER_R = 10;        /* polished rounded corners */
-  const GAP = 12;
-  const DETOUR_PAD = 24;      /* how far to clear cards on detour */
-  const exShort = ex - GAP;
-  const isLoopBack = sx + STUB > exShort - STUB;
-
-  /* Helper — does a horizontal segment at y=Y from x=X0 to x=X1 cut through
-     any non-endpoint card with `pad` clearance? */
-  const segmentCrossesCard = (x0, x1, y, pad = 8) => {
-    const xMin = Math.min(x0, x1) - pad, xMax = Math.max(x0, x1) + pad;
-    return allNodes.some(n => {
-      if (n.id === a.id || n.id === b.id) return false;
-      const nw = NODE_W[n.type], nh = getNodeH(n, mode);
-      return xMax > n.x && xMin < n.x + nw &&
-             y > n.y - pad && y < n.y + nh + pad;
-    });
-  };
-  /* Helper — does a vertical segment at x=X from y=Y0 to y=Y1 cut through
-     any non-endpoint card with `pad` clearance? */
-  const verticalCrossesCard = (x, y0, y1, pad = 8) => {
-    const yMin = Math.min(y0, y1) - pad, yMax = Math.max(y0, y1) + pad;
-    return allNodes.some(n => {
-      if (n.id === a.id || n.id === b.id) return false;
-      const nw = NODE_W[n.type], nh = getNodeH(n, mode);
-      return yMax > n.y && yMin < n.y + nh &&
-             x > n.x - pad && x < n.x + nw + pad;
-    });
-  };
-
-  let path = '';
-  let mx = 0, my = 0;       /* pill position */
-  let pillFits = false;     /* whether we found a clear horizontal segment for the pill */
-  let badgeX = 0, badgeY = 0;
-
-  if (!isLoopBack) {
-    /* === FORWARD case ===
-       Find a clear vertical-run column. Start at the geometric midpoint
-       and search left/right until we find a column that doesn't intersect
-       any blocking card. */
-    const idealMidX = (sx + STUB + exShort - STUB) / 2;
-    let midX = idealMidX;
-    /* Search candidates: ideal, then progressively further left and right */
-    const candidates = [idealMidX];
-    for (let off = 20; off <= 200; off += 20) {
-      candidates.push(idealMidX + off, idealMidX - off);
+  /* Iterative obstacle avoidance — sample bezier, find blockers, lift control
+     points clear, repeat up to 3 times. */
+  const PAD = 12;
+  const CLEARANCE = 40;
+  const findObstacles = () => allNodes.filter(n => {
+    if (n.id === a.id || n.id === b.id) return false;
+    const nw = NODE_W[n.type], nh = getNodeH(n, mode);
+    for (let i = 1; i < 12; i++) {
+      const t = i / 12;
+      const mt = 1 - t;
+      const x = Math.pow(mt, 3) * sx + 3 * Math.pow(mt, 2) * t * cx1 + 3 * mt * Math.pow(t, 2) * cx2 + Math.pow(t, 3) * ex;
+      const y = Math.pow(mt, 3) * sy + 3 * Math.pow(mt, 2) * t * cy1 + 3 * mt * Math.pow(t, 2) * cy2 + Math.pow(t, 3) * ey;
+      if (x >= n.x - PAD && x <= n.x + nw + PAD && y >= n.y - PAD && y <= n.y + nh + PAD) return true;
     }
-    /* Find first candidate where vertical run doesn't cross any card */
-    for (const cand of candidates) {
-      if (cand <= sx + STUB) continue;
-      if (cand >= exShort - STUB) continue;
-      if (!verticalCrossesCard(cand, sourceY, ey)) {
-        midX = cand;
-        break;
-      }
+    return false;
+  });
+
+  let direction = null;
+  for (let pass = 0; pass < 3; pass++) {
+    const obstacles = findObstacles();
+    if (!obstacles.length) break;
+    if (direction === null) {
+      const maxObstacleBottom = Math.max(...obstacles.map(o => o.y + getNodeH(o, mode)));
+      direction = (sy > maxObstacleBottom && ey > maxObstacleBottom) ? 'below' : 'above';
     }
-
-    /* Build path with rounded corners */
-    const buildForward = () => {
-      let p = `M ${sx},${sy}`;
-      /* ramp from sy → sourceY if branched */
-      if (sourceY !== sy) {
-        const rampSign = Math.sign(sourceY - sy);
-        p += ` L ${sx},${sourceY - rampSign * CORNER_R}`;
-        p += ` Q ${sx},${sourceY} ${sx + CORNER_R},${sourceY}`;
-      } else {
-        p += ` L ${sx + CORNER_R},${sy}`;
-      }
-      /* source stub → vertical run */
-      if (Math.abs(ey - sourceY) > 1) {
-        p += ` L ${midX - CORNER_R},${sourceY}`;
-        const vSign = Math.sign(ey - sourceY);
-        p += ` Q ${midX},${sourceY} ${midX},${sourceY + vSign * CORNER_R}`;
-        p += ` L ${midX},${ey - vSign * CORNER_R}`;
-        p += ` Q ${midX},${ey} ${midX + CORNER_R},${ey}`;
-        p += ` L ${exShort},${ey}`;
-      } else {
-        /* near-aligned — straight horizontal */
-        p += ` L ${exShort},${ey}`;
-      }
-      return p;
-    };
-    path = buildForward();
-
-    /* Pill placement — destination-side stub if it fits, else source-side */
-    const PILL_HALF = 56, PILL_MARGIN = 14;
-    const destStubLen = exShort - midX;
-    const sourceStubLen = midX - sx;
-    if (destStubLen >= PILL_HALF * 2 + PILL_MARGIN * 2) {
-      mx = midX + destStubLen / 2;
-      my = ey;
-      pillFits = true;
-    } else if (sourceStubLen >= PILL_HALF * 2 + PILL_MARGIN * 2) {
-      mx = sx + sourceStubLen / 2;
-      my = sourceY;
-      pillFits = true;
+    if (direction === 'above') {
+      const minObstacleY = Math.min(...obstacles.map(o => o.y));
+      const apexY = minObstacleY - CLEARANCE * (pass + 1);
+      cy1 = Math.min(cy1, apexY);
+      cy2 = Math.min(cy2, apexY);
     } else {
-      /* Last-resort: pick longer stub center; collision pass may nudge */
-      if (destStubLen >= sourceStubLen) {
-        mx = midX + destStubLen / 2;
-        my = ey;
-      } else {
-        mx = sx + sourceStubLen / 2;
-        my = sourceY;
-      }
+      const maxObstacleBottom = Math.max(...obstacles.map(o => o.y + getNodeH(o, mode)));
+      const apexY = maxObstacleBottom + CLEARANCE * (pass + 1);
+      cy1 = Math.max(cy1, apexY);
+      cy2 = Math.max(cy2, apexY);
     }
-
-    badgeX = exShort - 24;
-    badgeY = ey;
-  } else {
-    /* === LOOP-BACK case ===
-       Source is to the right of destination. Route up or down around the
-       row of cards. Pick whichever direction has more open space. */
-
-    /* Identify cards in the band between source and destination horizontally */
-    const xLo = Math.min(ex, sx) - 20;
-    const xHi = Math.max(ex, sx) + 20;
-    const blockers = allNodes.filter(n => {
-      if (n.id === a.id || n.id === b.id) return false;
-      const nw = NODE_W[n.type];
-      return n.x + nw > xLo && n.x < xHi;
-    });
-    /* Find topmost and bottommost edges of blockers */
-    let topY = Math.min(sy, ey), bottomY = Math.max(sy, ey);
-    blockers.forEach(n => {
-      const nh = getNodeH(n, mode);
-      topY = Math.min(topY, n.y);
-      bottomY = Math.max(bottomY, n.y + nh);
-    });
-    /* Decide above or below — pick the direction that's a shorter detour */
-    const goAbove = (topY - DETOUR_PAD) < (bottomY + DETOUR_PAD);
-    const detourY = goAbove ? topY - DETOUR_PAD : bottomY + DETOUR_PAD;
-
-    const buildLoopBack = () => {
-      let p = `M ${sx},${sy}`;
-      /* ramp to sourceY (branched) */
-      if (sourceY !== sy) {
-        const rampSign = Math.sign(sourceY - sy);
-        p += ` L ${sx},${sourceY - rampSign * CORNER_R}`;
-        p += ` Q ${sx},${sourceY} ${sx + CORNER_R},${sourceY}`;
-      } else {
-        p += ` L ${sx + CORNER_R},${sy}`;
-      }
-      /* short source stub */
-      const sStubX = sx + STUB;
-      p += ` L ${sStubX - CORNER_R},${sourceY}`;
-      /* corner: turn vertically to detourY */
-      const vSign = Math.sign(detourY - sourceY);
-      p += ` Q ${sStubX},${sourceY} ${sStubX},${sourceY + vSign * CORNER_R}`;
-      p += ` L ${sStubX},${detourY - vSign * CORNER_R}`;
-      /* corner: turn horizontally going LEFT toward destination */
-      p += ` Q ${sStubX},${detourY} ${sStubX - CORNER_R},${detourY}`;
-      /* horizontal traverse leftward at detourY */
-      const dStubX = ex - STUB;
-      p += ` L ${dStubX + CORNER_R},${detourY}`;
-      /* corner: turn vertically toward destination Y */
-      const v2Sign = Math.sign(ey - detourY);
-      p += ` Q ${dStubX},${detourY} ${dStubX},${detourY + v2Sign * CORNER_R}`;
-      p += ` L ${dStubX},${ey - v2Sign * CORNER_R}`;
-      /* corner: turn horizontally toward destination */
-      p += ` Q ${dStubX},${ey} ${dStubX + CORNER_R},${ey}`;
-      p += ` L ${exShort},${ey}`;
-      return p;
-    };
-    path = buildLoopBack();
-
-    /* Pill on the long horizontal traverse at detourY (the segment going left) */
-    const PILL_HALF = 56, PILL_MARGIN = 14;
-    const traverseLen = (sx + STUB) - (ex - STUB);
-    if (traverseLen >= PILL_HALF * 2 + PILL_MARGIN * 2) {
-      mx = (sx + STUB + ex - STUB) / 2;
-      my = detourY;
-      pillFits = true;
-    } else {
-      /* Fall back to the destination stub */
-      mx = ex - STUB / 2 - GAP / 2;
-      my = ey;
+    if (pass === 0) {
+      const obstacleLeft = Math.min(...obstacles.map(o => o.x));
+      const obstacleRight = Math.max(...obstacles.map(o => o.x + NODE_W[o.type]));
+      if (sx < obstacleLeft) cx1 = Math.max(cx1, obstacleLeft - 20);
+      if (ex > obstacleRight) cx2 = Math.min(cx2, obstacleRight + 20);
     }
-
-    badgeX = exShort - 24;
-    badgeY = ey;
   }
 
-  return { path, sx, sy, ex, ey,
-           cx1: sx + STUB, cy1: sourceY, cx2: 0, cy2: ey,
-           mx, my, bx: badgeX, by: badgeY, ang: 0,
-           pillFits };
+  /* gap before destination — 12px clearance reads as "approaching" not "touching" */
+  const gapPadding = 12;
+  const ang = Math.atan2(ey - cy2, ex - cx2);
+  const exShort = ex - Math.cos(ang) * gapPadding;
+  const eyShort = ey - Math.sin(ang) * gapPadding;
+  const path = `M ${sx},${sy} C ${cx1},${cy1} ${cx2},${cy2} ${exShort},${eyShort}`;
+
+  /* midpoint for chip + stats — t=0.5 */
+  const t = 0.5;
+  const mx = Math.pow(1-t,3)*sx + 3*Math.pow(1-t,2)*t*cx1 + 3*(1-t)*Math.pow(t,2)*cx2 + Math.pow(t,3)*ex;
+  const my = Math.pow(1-t,3)*sy + 3*Math.pow(1-t,2)*t*cy1 + 3*(1-t)*Math.pow(t,2)*cy2 + Math.pow(t,3)*ey;
+  /* badge anchor — t=0.85, near destination so branch identity reads at entry */
+  const bt = 0.85;
+  const bx = Math.pow(1-bt,3)*sx + 3*Math.pow(1-bt,2)*bt*cx1 + 3*(1-bt)*Math.pow(bt,2)*cx2 + Math.pow(bt,3)*ex;
+  const by = Math.pow(1-bt,3)*sy + 3*Math.pow(1-bt,2)*bt*cy1 + 3*(1-bt)*Math.pow(bt,2)*cy2 + Math.pow(bt,3)*ey;
+
+  return { path, sx, sy, ex, ey, cx1, cy1, cx2, cy2, mx, my, bx, by, ang };
 }
 
 
