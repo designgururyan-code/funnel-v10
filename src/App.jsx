@@ -98,7 +98,7 @@ const PAGE_TYPE = {
   landing:    { Icon: StarIcon, color: '#006CB5', label:'Landing'   },
   form:       { Icon: Form,     color: '#006CB5', label:'Lead form' },
   sales:      { Icon: Tag,      color: '#7C3AED', label:'Sales'     },
-  checkout:   { Icon: Cart,     color: '#7C3AED', label:'Checkout'  },
+  checkout:   { Icon: Cart,     color: '#0891B2', label:'Checkout'  }, /* cyan to match Quick Add */
   thanks:     { Icon: Check,    color: '#10B981', label:'Thank you' },
   membership: { Icon: Lock,     color: '#7C3AED', label:'Members'   },
   webinar:    { Icon: Video,    color: '#006CB5', label:'Webinar'   },
@@ -608,7 +608,7 @@ const DEMO_STATES = {
   leadMagnet: {
     label: 'Lead Magnet',
     nodes: [
-      { id:'s1', type:'source', x:60,   y:240, data:{ src:'fb', visitorsNum:5160, visitorsLabel:'5.2k' } },
+      { id:'s1', type:'source', x:60,   y:240, data:{ src:'fb', visitorsNum:5160, visitorsLabel:'5.2k', sourceKind: 'paid', cost: 380, currency: 'USD' } },
       { id:'p1', type:'page',   x:380,  y:220, data:{ pageType:'landing', title:'May Promo Landing', path:'/may-promo',     status:'live',  visitors:3200, conversions:768, rate:24.0 } },
       { id:'p2', type:'page',   x:740,  y:220, data:{ pageType:'form',    title:'Lead Magnet Form',  path:'/download',      status:'live',  visitors:768,  conversions:412, rate:53.6 } },
       { id:'p3', type:'page',   x:1100, y:220, data:{ pageType:'thanks',  title:'Thank You',         path:'/thanks',        status:'live',  visitors:412,  conversions:412, rate:100  } },
@@ -642,7 +642,7 @@ const DEMO_STATES = {
     label: 'Tripwire',
     nodes: [
       { id:'p1', type:'page', x:80,   y:220, data:{ pageType:'sales',    title:'$7 Tripwire',       path:'/7-offer',     status:'live',  visitors:1280, conversions:286, rate:22.3 } },
-      { id:'p2', type:'page', x:440,  y:220, data:{ pageType:'checkout', title:'Order Form',        path:'/checkout',    status:'live',  visitors:286,  conversions:204, rate:71.3 } },
+      { id:'p2', type:'page', x:440,  y:220, data:{ pageType:'checkout', title:'Order Form',        path:'/checkout',    status:'live',  visitors:286,  conversions:204, rate:71.3, price: 27, currency: 'USD', productName: 'Tripwire Offer' } },
       { id:'p3', type:'page', x:800,  y:220, data:{ pageType:'upsell',   title:'$47 Upsell',        path:'/upsell-1',    status:'live',  visitors:204,  conversions:62,  rate:30.4 } },
       { id:'p4', type:'page', x:1160, y:220, data:{ pageType:'thanks',   title:'Order Confirmed',   path:'/order-done',  status:'live',  visitors:204,  conversions:204, rate:100  } },
     ],
@@ -661,7 +661,7 @@ const DEMO_STATES = {
       { id:'p1', type:'page',   x:380,  y:220, data:{ pageType:'landing',    title:'Black Friday Hub', path:'/bf2025',      status:'live',  visitors:4600, conversions:1380, rate:30.0 } },
       { id:'p2', type:'page',   x:740,  y:220, data:{ pageType:'form',       title:'VIP List Opt-in',  path:'/vip',         status:'live',  visitors:1380, conversions:892,  rate:64.6 } },
       { id:'p3', type:'page',   x:1100, y:220, data:{ pageType:'sales',      title:'Founding Offer',   path:'/founding',    status:'live',  visitors:892,  conversions:124,  rate:13.9 } },
-      { id:'p4', type:'page',   x:1460, y:220, data:{ pageType:'checkout',   title:'Checkout',         path:'/buy',         status:'live',  visitors:124,  conversions:96,   rate:77.4 } },
+      { id:'p4', type:'page',   x:1460, y:220, data:{ pageType:'checkout',   title:'Checkout',         path:'/buy',         status:'live',  visitors:124,  conversions:96,   rate:77.4, price: 197, currency: 'USD', productName: 'Sales Funnel Offer' } },
       { id:'p5', type:'page',   x:1820, y:120, data:{ pageType:'upsell',     title:'Vault Upsell',     path:'/vault',       status:'draft', visitors:96,   conversions:28,   rate:29.2 } },
       { id:'p6', type:'page',   x:1820, y:340, data:{ pageType:'thanks',     title:'Welcome Aboard',   path:'/welcome',     status:'live',  visitors:96,   conversions:96,   rate:100  } },
     ],
@@ -1093,9 +1093,9 @@ function Sidebar({ onAIClick, onBuildAIClick, collapsed, onToggleCollapsed, focu
         <QuickIcon Icon={Globe}    color="#10B981" tint="#ECFDF5" tintHover="#D1FAE5" label="Add traffic source"
           onClick={() => canvasApi?.current?.addNode({ type:'source', data:{ src:'fb', visitorsNum:0 } })}/>
         <QuickIcon Icon={FileIcon} color="#006CB5" tint="#E6F0F9" tintHover="#CCE0F1" label="Add page"
-          onClick={() => canvasApi?.current?.addNode({ type:'page',   data:{ title:'New page', path:'/new', kind:'landing' } })}/>
+          onClick={() => canvasApi?.current?.addNode({ type:'page',   data:{ title:'New page', path:'/new', pageType:'landing', kind:'landing' } })}/>
         <QuickIcon Icon={Cart}     color="#0891B2" tint="#E0F7FA" tintHover="#B2EBF2" label="Add checkout"
-          onClick={() => canvasApi?.current?.addNode({ type:'page',   data:{ title:'Checkout', path:'/checkout', kind:'checkout' } })}/>
+          onClick={() => canvasApi?.current?.addNode({ type:'page',   data:{ title:'Checkout', path:'/checkout', pageType:'checkout', kind:'checkout' } })}/>
         {/* Divider — separates page-creation from flow-logic */}
         <div className="w-px h-5 bg-line-soft mx-0.5"/>
         {/* Logic cluster — A/B test = orange to read as "test/experiment",
@@ -1188,7 +1188,7 @@ function Sidebar({ onAIClick, onBuildAIClick, collapsed, onToggleCollapsed, focu
           </span>
           <div className="flex-1 text-left">
             <div className="text-[12.5px] font-semibold text-ink leading-none">Build with AI</div>
-            <div className="text-[10.5px] text-ink-soft mt-0.5">Describe your funnel, AI builds it</div>
+            <div className="text-[10.5px] text-violet/70 mt-0.5">Describe your funnel, AI builds it</div>
           </div>
           <ChevronRight size={11} className="text-violet"/>
         </button>
@@ -1294,6 +1294,20 @@ function PageRow({ page, inFunnel, draggable=true, active=false, isInFunnel=fals
         <div className={`text-[10.5px] mt-px truncate ${active ? 'text-brand/70' : 'text-ink-soft'}`}>{page.path}</div>
       </div>
       <div className="flex items-center gap-1 mt-px">
+        {/* Add-to-funnel quick action (drag alternative). Only shows for
+            library rows that aren't already on canvas, and only on row hover. */}
+        {!inFunnel && draggable && (
+          <Tip label="Add to funnel" side="top">
+            <button onClick={(e) => {
+                e.stopPropagation();
+                /* Custom event so Canvas can listen and do the add */
+                window.dispatchEvent(new CustomEvent('sidebar-add-page', { detail: { page } }));
+              }}
+              className="row-action w-5 h-5 inline-flex items-center justify-center rounded hover:bg-brand-soft text-ink-soft hover:text-brand transition-colors opacity-0 group-hover/row:opacity-100">
+              <Plus size={12}/>
+            </button>
+          </Tip>
+        )}
         <Tip label="Open page in new window" side="top">
           <button onClick={(e) => { e.stopPropagation(); window.open('#preview-' + page.id, '_blank'); }}
             className="row-action w-5 h-5 inline-flex items-center justify-center rounded hover:bg-white text-ink-soft hover:text-brand transition-colors">
@@ -1402,24 +1416,22 @@ function AIPopover({ open, onClose }) {
 
 /* ─── EMPTY CANVAS — staged funnel mark + headline + sub + helper links ─── */
 function EmptyCanvas({ onJumpToTemplates, onJumpToPages }) {
-  /* 3-step start wizard. Replaces the old centred empty-canvas card.
-     Action-oriented: each step is its own card with a CTA. The bottom row
-     offers shortcuts to a template gallery or AI-driven build. */
+  /* 3-step start wizard. Bigger cards, more breathing room — second pass. */
   return (
-    <div className="absolute inset-0 flex items-center justify-center p-6 pointer-events-none">
-      <div className="pointer-events-auto w-full max-w-[640px] mx-auto">
-        <div className="text-center mb-5">
+    <div className="absolute inset-0 flex items-center justify-center p-8 pointer-events-none">
+      <div className="pointer-events-auto w-full max-w-[760px] mx-auto">
+        <div className="text-center mb-7">
           <div className="text-[11px] font-semibold uppercase tracking-wider text-ink-soft">Get started</div>
-          <h2 className="text-[19px] font-semibold text-ink mt-1">Build your funnel in 3 steps</h2>
-          <p className="text-[12.5px] text-ink-soft mt-1.5 max-w-[420px] mx-auto leading-relaxed">
+          <h2 className="text-[22px] font-semibold text-ink mt-1.5">Build your funnel in 3 steps</h2>
+          <p className="text-[13px] text-ink-soft mt-2 max-w-[460px] mx-auto leading-relaxed">
             Add a traffic source, drop in your first page, and connect them. You can always start from a template instead.
           </p>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-4">
           <WizardStep n={1} accent="#10B981" tint="#ECFDF5" Icon={Globe}
             title="Add a traffic source"
-            sub="Where do visitors come from? Facebook, Email, YouTube…"
+            sub="Where do visitors come from? Facebook, Email, YouTube and more."
             cta="Add source" onClick={onJumpToPages}/>
           <WizardStep n={2} accent="#006CB5" tint="#E6F0F9" Icon={FileIcon}
             title="Add your first page"
@@ -1431,14 +1443,14 @@ function EmptyCanvas({ onJumpToTemplates, onJumpToPages }) {
             cta="Got it" onClick={onJumpToPages}/>
         </div>
 
-        <div className="mt-4 flex items-center justify-center gap-2 text-[12px]">
+        <div className="mt-6 flex items-center justify-center gap-2.5 text-[12.5px]">
           <button onClick={onJumpToTemplates}
-            className="h-8 px-3 inline-flex items-center gap-1.5 rounded-md bg-white border border-line text-ink-muted hover:text-ink hover:bg-surface-sub transition-colors">
-            <Workflow size={12}/> Use a template
+            className="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-md bg-white border border-line text-ink-muted hover:text-ink hover:bg-surface-sub transition-colors font-medium">
+            <Workflow size={13}/> Use a template
           </button>
           <button onClick={() => window.dispatchEvent(new CustomEvent('open-build-ai'))}
-            className="h-8 px-3 inline-flex items-center gap-1.5 rounded-md bg-violet-soft border border-violet/20 text-violet hover:bg-white transition-colors">
-            <Spark size={12}/> Ask AI to build it
+            className="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-md bg-violet-soft border border-violet/20 text-violet hover:bg-white transition-colors font-medium">
+            <Spark size={13}/> Ask AI to build it
           </button>
         </div>
       </div>
@@ -1448,19 +1460,19 @@ function EmptyCanvas({ onJumpToTemplates, onJumpToPages }) {
 
 function WizardStep({ n, accent, tint, Icon, title, sub, cta, onClick }) {
   return (
-    <div className="bg-white border border-line-soft rounded-lg p-3.5 hover:border-line-strong hover:shadow-card transition-all">
-      <div className="flex items-center gap-2 mb-2">
-        <span className="w-7 h-7 rounded-md inline-flex items-center justify-center" style={{ background: tint, color: accent }}>
-          <Icon size={14}/>
+    <div className="bg-white border border-line-soft rounded-xl p-5 hover:border-line-strong hover:shadow-card transition-all min-h-[200px] flex flex-col">
+      <div className="flex items-center gap-2.5 mb-3">
+        <span className="w-9 h-9 rounded-md inline-flex items-center justify-center" style={{ background: tint, color: accent }}>
+          <Icon size={16}/>
         </span>
-        <span className="text-[10px] font-bold uppercase tracking-wider text-ink-soft">Step {n}</span>
+        <span className="text-[10.5px] font-bold uppercase tracking-wider text-ink-soft">Step {n}</span>
       </div>
-      <div className="text-[12.5px] font-semibold text-ink leading-tight">{title}</div>
-      <div className="text-[11px] text-ink-soft mt-1 leading-relaxed">{sub}</div>
+      <div className="text-[14px] font-semibold text-ink leading-tight mb-1.5">{title}</div>
+      <div className="text-[12px] text-ink-soft leading-relaxed mb-4 flex-1">{sub}</div>
       <button onClick={onClick}
-        className="mt-2.5 h-7 px-2.5 inline-flex items-center gap-1 rounded text-[11.5px] font-semibold text-white transition-opacity hover:opacity-90"
+        className="h-8 px-3 inline-flex items-center justify-center gap-1 rounded-md text-[12px] font-semibold text-white transition-opacity hover:opacity-90 self-start"
         style={{ background: accent }}>
-        {cta} <ChevronRight size={11}/>
+        {cta} <ChevronRight size={12}/>
       </button>
     </div>
   );
@@ -1965,7 +1977,8 @@ function LogicNode({ node, selected, onSelect, onDragStart, onConnectStart, onRe
   const readonly = mode !== 'build';
   const kind = LOGIC_KIND[node.data.kind] || LOGIC_KIND.condition;
   const Ic = node.data.kind === 'abtest' ? Bars : Workflow;
-  const VIOLET = '#7C3AED';
+  const accentColor = node.data.kind === 'abtest' ? '#F59E0B' : accentColor;
+  const VIOLET = accentColor;
   /* meter showing how many of the 2 branches are wired */
   const branchesUsed = Math.min(outgoingCount || 0, 2);
 
@@ -2336,7 +2349,7 @@ function EdgeOverlays({ nodes, edges, zoom, hovered, onHover, onRemove, onInsert
         const rate = fromVisitors ? Math.round((vol / fromVisitors) * 100) : null;
         const hasLabel = !!e.label;
         const showInteractive = isHovered && mode === 'build';
-        const showStats = !isHovered && mode === 'analyse' && vol > 0;
+        const showStats = mode === 'analyse' && vol > 0;
 
         return (
           <g key={i}>
@@ -2370,7 +2383,7 @@ function EdgeOverlays({ nodes, edges, zoom, hovered, onHover, onRemove, onInsert
               const text = rate != null ? `${formatVolume(vol)} · ${rate}%` : formatVolume(vol);
               // Padding: 14 left + text + 6 spacer + 18 button + 6 right = full width
               const padL = 14, padR = 6, btnW = 18, spacer = 6;
-              const textW = text.length * 6.6;
+              const textW = text.length * 6.0;
               const w = padL + textW + spacer + btnW + padR;
               const cy = geo.my + (hasLabel ? 14 : 0);
               const isOpen = statsOpen === i;
@@ -2381,10 +2394,10 @@ function EdgeOverlays({ nodes, edges, zoom, hovered, onHover, onRemove, onInsert
                         fill="white" stroke="#E5E7EB" strokeWidth="1"
                         style={{ filter: 'drop-shadow(0 1px 2px rgba(15,23,42,0.06))', pointerEvents: 'none' }}/>
                   {/* number + percent */}
-                  <text x={-w/2 + padL + textW/2} y="4.5" textAnchor="middle" fontSize="12" fontWeight="700" fill="#0F172A"
+                  <text x={-w/2 + padL + textW/2} y="4" textAnchor="middle" fontSize="11" fontWeight="700" fill="#0F172A"
                         style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif', pointerEvents: 'none' }}>{text}</text>
                   {/* embedded green stats button at right end */}
-                  <foreignObject x={w/2 - padR - btnW} y={-9} width={btnW} height={btnW} style={{ overflow: 'visible' }}>
+                  <foreignObject x={w/2 - padR - btnW} y={-btnW/2} width={btnW} height={btnW} style={{ overflow: 'visible' }}>
                     <button onClick={(ev) => { ev.stopPropagation(); setStatsOpen(isOpen ? null : i); }}
                       title="Path stats"
                       className="w-[18px] h-[18px] inline-flex items-center justify-center rounded-full bg-good text-white hover:bg-good-deep transition-colors shadow-xs">
@@ -3167,6 +3180,27 @@ function Canvas({ mode, demoState, onDemoStateChange, onJumpToTemplates, onJumpT
      First mount stays at 100% zoom (so users always land on a 100% view —
      small funnels don't shrink). Subsequent demo-state switches fit-to-canvas
      so the user can compare framings. */
+  /* Listen for sidebar "+" Add buttons — so users can click instead of drag. */
+  useEffect(() => {
+    const onAdd = (e) => {
+      const page = e?.detail?.page;
+      if (!page) return;
+      // Append to nodes with auto-positioning (rightmost + 320, same y)
+      setNodes(ns => {
+        const id = 'p' + Date.now();
+        let x = 200, y = 220;
+        if (ns.length) {
+          const rightmost = ns.reduce((a, b) => (b.x > a.x ? b : a));
+          x = rightmost.x + (NODE_W[rightmost.type] || 260) + 60;
+          y = rightmost.y;
+        }
+        return [...ns, { id, x, y, type: 'page', data: { pageType: page.type || 'custom', title: page.title, path: page.path, status: page.status || 'draft' } }];
+      });
+    };
+    window.addEventListener('sidebar-add-page', onAdd);
+    return () => window.removeEventListener('sidebar-add-page', onAdd);
+  }, []);
+
   const firstMountRef = useRef(true);
   useEffect(() => {
     const s = DEMO_STATES[demoState] || DEMO_STATES.empty;
@@ -3553,7 +3587,8 @@ function inspectorMeta(node) {
   if (node.type === 'logic') {
     const k = node.data.kind === 'abtest' ? 'A/B test' : 'Condition';
     const Ic = node.data.kind === 'abtest' ? Bars : Workflow;
-    return { color: '#7C3AED', Icon: Ic, kindLabel: 'Logic · ' + k, title: node.data.title || k };
+    const color = node.data.kind === 'abtest' ? '#F59E0B' : '#7C3AED';
+    return { color, Icon: Ic, kindLabel: 'Logic · ' + k, title: node.data.title || k };
   }
   return { color: '#94A3B8', Icon: FileIcon, kindLabel: '—', title: '—' };
 }
@@ -4158,6 +4193,35 @@ function InspectorSettings({ node, api }) {
             <option value="paused">Paused</option>
           </select>
         </Field>
+        {node.type === 'page' && (
+          <Field label="Replace page">
+            <select
+              value={node.data.linkedPageId || ''}
+              onChange={(e) => {
+                const pid = e.target.value;
+                if (!pid) return;
+                const page = PAGES[pid];
+                if (page) {
+                  api.updateNodeData(node.id, {
+                    linkedPageId: pid,
+                    title: page.title,
+                    path: page.path,
+                    pageType: page.type || node.data.pageType,
+                    status: page.status || node.data.status,
+                  });
+                }
+              }}
+              className="w-full h-7 pl-2 pr-7 text-[11.5px] text-ink bg-surface-sub border border-line-soft rounded outline-none focus:border-brand">
+              <option value="">Keep template page…</option>
+              {Object.values(PAGES).map(p => (
+                <option key={p.id} value={p.id}>{p.title} · {p.path}</option>
+              ))}
+            </select>
+            <p className="text-[10.5px] text-ink-soft leading-snug mt-1">
+              Swap this template placeholder with a real page from your project.
+            </p>
+          </Field>
+        )}
         {isPage && (
           <Field label="URL slug">
             <div className="flex items-center gap-1">
@@ -4511,7 +4575,14 @@ function InspectorEmpty({ funnel, canvasNodes = [], mode = "build" }) {
   // Optimise mode — replace the stats grid entirely with the optimisation queue
   // (Urgent fixes / Growth tests / Completed learnings).
   if (mode === 'optimise') {
-    return <OptimiseEmptyState funnel={funnel}/>;
+    // CRITICAL: wrap in the same aside as the build/analyse path so the
+    // panel keeps its 320px width. Without this wrapper, OptimiseEmptyState
+    // expands to fill available space and the right panel looks bloated.
+    return (
+      <aside className="w-[320px] border-l border-line bg-white flex flex-col shrink-0">
+        <OptimiseEmptyState funnel={funnel}/>
+      </aside>
+    );
   }
 
   // Analyse mode — diagnosis-first layout: biggest leak + best step + next action
@@ -4565,6 +4636,55 @@ function InspectorEmpty({ funnel, canvasNodes = [], mode = "build" }) {
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto scroll-thin">
+        {/* Diagnosis-first Analyse callout — sits above the stats grid in
+           Analyse mode only. Surfaces the biggest leak + best step + a single
+           next-action so the user knows where to look first. */}
+        {showDiagnosis && (() => {
+          const pages = canvasNodes.filter(n => n.type === 'page' && typeof n.data.rate === 'number');
+          if (!pages.length) return null;
+          const sorted = [...pages].sort((a, b) => (a.data.rate || 0) - (b.data.rate || 0));
+          const worst = sorted[0];
+          const best  = sorted[sorted.length - 1];
+          const worstDrop = Math.max(0, 100 - (worst?.data?.rate || 0));
+          return (
+            <div className="px-4 pt-3 pb-1">
+              <div className="rounded-lg border border-line-soft p-3 bg-white">
+                <div className="flex items-center gap-2 mb-2.5">
+                  <span className="w-7 h-7 rounded-md bg-warn-soft text-warn-deep inline-flex items-center justify-center">
+                    <Activity size={13}/>
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[10.5px] font-semibold uppercase tracking-wider text-ink-soft">Funnel health</div>
+                    <div className="text-[12px] font-semibold text-ink leading-tight">Needs attention</div>
+                  </div>
+                </div>
+                <div className="space-y-2 text-[11.5px]">
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wider text-ink-soft">Biggest leak</div>
+                    <div className="text-ink leading-snug mt-0.5">
+                      <span className="font-semibold">{worst?.data?.title || '—'}</span>
+                      <span className="text-bad-deep font-semibold tabular-nums"> · {worstDrop.toFixed(0)}% drop-off</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wider text-ink-soft">Best step</div>
+                    <div className="text-ink leading-snug mt-0.5">
+                      <span className="font-semibold">{best?.data?.title || '—'}</span>
+                      <span className="text-good-deep font-semibold tabular-nums"> · {(best?.data?.rate || 0).toFixed(0)}% conversion</span>
+                    </div>
+                  </div>
+                  <div className="pt-2 border-t border-line-soft">
+                    <div className="text-[10px] uppercase tracking-wider text-ink-soft">Suggested next action</div>
+                    <div className="text-ink leading-snug mt-0.5">Tighten the headline + CTA on <span className="font-semibold">{worst?.data?.title || 'the weakest page'}</span> to lift conversion.</div>
+                  </div>
+                </div>
+                <button className="mt-3 w-full h-7 px-2.5 inline-flex items-center justify-center gap-1 rounded text-[11.5px] font-semibold text-white bg-violet hover:bg-violet-deep transition-colors">
+                  <Spark size={11}/> Open in Optimise
+                </button>
+              </div>
+            </div>
+          );
+        })()}
         {/* Stats grid — 8 stats, 2 cols, white cards with category-colored icon chips */}
         <div className="px-4 py-3 grid grid-cols-2 gap-2 stat-stagger">
           {stats.map((s, i) => (
@@ -4905,6 +5025,8 @@ function ExportFunnelButton() {
    exits chat mode and restores the normal sidebar. */
 function BuildWithAIChat({ open, onClose }) {
   const [input, setInput] = useState('');
+  const [sectionsOpen, setSectionsOpen] = useState({ pages: false, inFunnel: false, sources: false, templates: false });
+  const toggleSection = (key) => setSectionsOpen(s => ({ ...s, [key]: !s[key] }));
   const [messages, setMessages] = useState([
     { from: 'ai', text: "Hi! I'll help you build a funnel. What kind of business do you have, and what do you want this funnel to achieve?" },
   ]);
@@ -4942,14 +5064,30 @@ function BuildWithAIChat({ open, onClose }) {
         </div>
       </div>
 
-      {/* Collapsed sections — same look as the regular sidebar (uppercase
-          label, chevron, count pill), just rendered closed. The chat takes
-          over the body; the sections sit at top as a visible reference. */}
+      {/* Same Section components as the regular sidebar — uppercase labels,
+         chevron, count pill — and now FULLY FUNCTIONAL. They open and collapse
+         normally. The chat fills whatever space is left below. */}
       <div className="border-b border-line-soft shrink-0">
-        <Section title="Add Pages"        count={12} open={false} onToggle={() => {}}/>
-        <Section title="Current Funnel"   count={0}  open={false} onToggle={() => {}}/>
-        <Section title="Traffic"          count={9}  open={false} onToggle={() => {}}/>
-        <Section title="Funnel Templates" count={7}  open={false} onToggle={() => {}} last/>
+        <Section title="Add Pages"        count={12} open={sectionsOpen.pages}     onToggle={() => toggleSection('pages')}>
+          <div className="px-4 py-2 text-[11px] text-ink-soft leading-relaxed">
+            Drag any page from your project to drop it on the canvas, or use Quick add above.
+          </div>
+        </Section>
+        <Section title="Current Funnel"   count={0}  open={sectionsOpen.inFunnel}  onToggle={() => toggleSection('inFunnel')}>
+          <div className="px-4 py-2 text-[11px] text-ink-soft leading-relaxed">
+            Pages you've added to this funnel will appear here.
+          </div>
+        </Section>
+        <Section title="Traffic"          count={9}  open={sectionsOpen.sources}   onToggle={() => toggleSection('sources')}>
+          <div className="px-4 py-2 text-[11px] text-ink-soft leading-relaxed">
+            Connect Facebook, Email, Google Ads and more to send traffic into the funnel.
+          </div>
+        </Section>
+        <Section title="Funnel Templates" count={7}  open={sectionsOpen.templates} onToggle={() => toggleSection('templates')} last>
+          <div className="px-4 py-2 text-[11px] text-ink-soft leading-relaxed">
+            Start from a proven funnel structure: Lead Magnet, Webinar, Sales Funnel, more.
+          </div>
+        </Section>
       </div>
 
       {/* Chat scroll */}
