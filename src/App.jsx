@@ -1503,105 +1503,164 @@ function WizardStep({ n, accent, tint, Icon, title, sub, cta, onClick }) {
 
 /* ─── WIREFRAME — small SVG mock of a webpage body, tinted per page type ─── */
 function Wireframe({ type }) {
-  /* Single neutral slate palette — bg + 3 opacity stops on slate-400.
-     Page TYPE is conveyed by the colored top border + icon on the card; the
-     wireframe is pure skeleton (loading-state aesthetic, not a colored thumbnail). */
-  const BG       = '#F1F5F9';                    /* surface-muted, near-white */
-  const PRIMARY  = 'rgba(100,116,139,0.55)';     /* slate-500, hero/CTA blocks */
-  const SOLID    = 'rgba(100,116,139,0.85)';     /* slate-500 darker, button */
+  /* Upgraded skeleton mockups — every layout sits inside a faux browser
+     chrome (3 traffic-light dots + URL bar), uses subtle gradients on hero
+     blocks, and renders realistic UI proportions for buttons and inputs.
+     The page TYPE is conveyed by the colored top border + icon on the
+     parent card; the wireframe stays neutral grey. */
+  const BG       = '#FAFBFC';                    /* near-white page surface */
+  const CHROME   = '#F1F4F8';                    /* browser chrome */
+  const PRIMARY  = 'rgba(100,116,139,0.55)';     /* hero/CTA blocks */
+  const SOLID    = 'rgba(100,116,139,0.85)';     /* button */
   const SECONDARY= 'rgba(100,116,139,0.30)';     /* text lines */
-  const FAINT    = 'rgba(100,116,139,0.18)';     /* sub-blocks */
+  const FAINT    = 'rgba(100,116,139,0.16)';     /* sub-blocks */
+  const BORDER   = 'rgba(100,116,139,0.22)';     /* card outlines */
+  /* Browser chrome — sits at top of every layout, gives "real page" affordance */
+  const Chrome = (
+    <g>
+      <rect x="0" y="0" width="240" height="14" fill={CHROME}/>
+      <circle cx="6.5" cy="7" r="1.6" fill="#E94B4B" opacity="0.65"/>
+      <circle cx="11.5" cy="7" r="1.6" fill="#F2B33D" opacity="0.7"/>
+      <circle cx="16.5" cy="7" r="1.6" fill="#42C168" opacity="0.7"/>
+      <rect x="62" y="3.5" width="116" height="7" rx="3.5" fill="white" stroke={BORDER} strokeWidth="0.5"/>
+      <line x1="0" y1="14" x2="240" y2="14" stroke={BORDER} strokeWidth="0.5"/>
+    </g>
+  );
   const layouts = {
     landing: (
       <>
-        <rect x="6" y="4"  width="60"  height="6"  rx="1" fill={SECONDARY}/>
-        <rect x="200" y="6" width="32" height="4"  rx="1" fill={FAINT}/>
-        <rect x="20" y="22" width="200" height="14" rx="2" fill={PRIMARY}/>
-        <rect x="20" y="44" width="180" height="3"  rx="1" fill={FAINT}/>
-        <rect x="20" y="51" width="160" height="3"  rx="1" fill={FAINT}/>
-        <rect x="20" y="58" width="170" height="3"  rx="1" fill={FAINT}/>
-        <rect x="20" y="74" width="60"  height="14" rx="3" fill={SOLID}/>
+        {Chrome}
+        {/* hero with subtle vertical gradient */}
+        <defs>
+          <linearGradient id="wf-hero" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="rgba(100,116,139,0.70)"/>
+            <stop offset="100%" stopColor="rgba(100,116,139,0.40)"/>
+          </linearGradient>
+        </defs>
+        <rect x="20" y="28" width="200" height="14" rx="2" fill="url(#wf-hero)"/>
+        <rect x="20" y="50" width="180" height="2.5" rx="1" fill={FAINT}/>
+        <rect x="20" y="56" width="160" height="2.5" rx="1" fill={FAINT}/>
+        <rect x="20" y="62" width="170" height="2.5" rx="1" fill={FAINT}/>
+        {/* CTA button with subtle shadow strip below */}
+        <rect x="20" y="74" width="64" height="14" rx="3" fill={SOLID}/>
+        <rect x="20" y="88" width="64" height="1.5" rx="0.75" fill="rgba(15,23,42,0.06)"/>
       </>
     ),
     form: (
       <>
-        <rect x="6" y="4"  width="60"  height="6"  rx="1" fill={SECONDARY}/>
-        <rect x="20" y="22" width="120" height="10" rx="2" fill={PRIMARY}/>
-        <rect x="20" y="42" width="200" height="9" rx="2"  fill={BG} stroke={SECONDARY} strokeWidth="0.6"/>
-        <rect x="20" y="56" width="200" height="9" rx="2"  fill={BG} stroke={SECONDARY} strokeWidth="0.6"/>
-        <rect x="20" y="74" width="200" height="14" rx="3" fill={SOLID}/>
+        {Chrome}
+        <rect x="20" y="22" width="120" height="9" rx="2" fill={PRIMARY}/>
+        <rect x="20" y="36" width="40"  height="3" rx="1" fill={FAINT}/>
+        <rect x="20" y="44" width="200" height="11" rx="2" fill="white" stroke={BORDER} strokeWidth="0.8"/>
+        <rect x="20" y="60" width="40"  height="3" rx="1" fill={FAINT}/>
+        <rect x="20" y="68" width="200" height="11" rx="2" fill="white" stroke={BORDER} strokeWidth="0.8"/>
+        <rect x="20" y="84" width="200" height="14" rx="3" fill={SOLID}/>
       </>
     ),
     sales: (
       <>
-        <rect x="6" y="4"  width="60"  height="6"  rx="1" fill={SECONDARY}/>
+        {Chrome}
         <rect x="20" y="22" width="200" height="12" rx="2" fill={PRIMARY}/>
-        <rect x="20" y="44" width="58" height="22" rx="2"  fill={FAINT}/>
-        <rect x="91" y="44" width="58" height="22" rx="2"  fill={FAINT}/>
-        <rect x="162" y="44" width="58" height="22" rx="2" fill={FAINT}/>
-        <rect x="20" y="74" width="80"  height="14" rx="3" fill={SOLID}/>
+        {/* 3 product/benefit cards with soft borders */}
+        <rect x="20" y="44" width="58" height="22" rx="2" fill="white" stroke={BORDER} strokeWidth="0.8"/>
+        <rect x="91" y="44" width="58" height="22" rx="2" fill="white" stroke={BORDER} strokeWidth="0.8"/>
+        <rect x="162" y="44" width="58" height="22" rx="2" fill="white" stroke={BORDER} strokeWidth="0.8"/>
+        {/* tiny content inside each card */}
+        <rect x="26" y="48" width="20" height="2" rx="1" fill={SECONDARY}/>
+        <rect x="26" y="54" width="46" height="2" rx="1" fill={FAINT}/>
+        <rect x="26" y="60" width="32" height="2" rx="1" fill={FAINT}/>
+        <rect x="97" y="48" width="20" height="2" rx="1" fill={SECONDARY}/>
+        <rect x="97" y="54" width="46" height="2" rx="1" fill={FAINT}/>
+        <rect x="97" y="60" width="32" height="2" rx="1" fill={FAINT}/>
+        <rect x="168" y="48" width="20" height="2" rx="1" fill={SECONDARY}/>
+        <rect x="168" y="54" width="46" height="2" rx="1" fill={FAINT}/>
+        <rect x="168" y="60" width="32" height="2" rx="1" fill={FAINT}/>
+        <rect x="20" y="74" width="80" height="14" rx="3" fill={SOLID}/>
       </>
     ),
     checkout: (
       <>
-        <rect x="6" y="4"  width="60"  height="6"  rx="1" fill={SECONDARY}/>
-        <rect x="20" y="22" width="130" height="9" rx="2"  fill={BG} stroke={SECONDARY} strokeWidth="0.6"/>
-        <rect x="20" y="36" width="130" height="9" rx="2"  fill={BG} stroke={SECONDARY} strokeWidth="0.6"/>
-        <rect x="20" y="50" width="130" height="9" rx="2"  fill={BG} stroke={SECONDARY} strokeWidth="0.6"/>
+        {Chrome}
+        {/* form fields stacked left */}
+        <rect x="20" y="22" width="130" height="10" rx="2" fill="white" stroke={BORDER} strokeWidth="0.8"/>
+        <rect x="20" y="36" width="130" height="10" rx="2" fill="white" stroke={BORDER} strokeWidth="0.8"/>
+        <rect x="20" y="50" width="130" height="10" rx="2" fill="white" stroke={BORDER} strokeWidth="0.8"/>
         <rect x="20" y="74" width="60"  height="14" rx="3" fill={SOLID}/>
-        <rect x="160" y="22" width="62" height="60" rx="2" fill={FAINT} stroke={SECONDARY} strokeWidth="0.6"/>
-        <rect x="167" y="30" width="40" height="4"  rx="1" fill={SECONDARY}/>
-        <rect x="167" y="42" width="48" height="3"  rx="1" fill={FAINT}/>
-        <rect x="167" y="50" width="44" height="3"  rx="1" fill={FAINT}/>
-        <rect x="167" y="68" width="48" height="6"  rx="1" fill={PRIMARY}/>
+        {/* order summary card right */}
+        <rect x="160" y="22" width="62" height="60" rx="2" fill="white" stroke={BORDER} strokeWidth="0.8"/>
+        <rect x="167" y="30" width="40" height="3"  rx="1" fill={SECONDARY}/>
+        <rect x="167" y="40" width="48" height="2.5" rx="1" fill={FAINT}/>
+        <rect x="167" y="48" width="44" height="2.5" rx="1" fill={FAINT}/>
+        <line x1="167" y1="58" x2="215" y2="58" stroke={BORDER} strokeWidth="0.5"/>
+        <rect x="167" y="64" width="20" height="3"  rx="1" fill={SECONDARY}/>
+        <rect x="195" y="64" width="20" height="3"  rx="1" fill={SOLID}/>
       </>
     ),
     thanks: (
       <>
-        <rect x="6" y="4"  width="60"  height="6"  rx="1" fill={SECONDARY}/>
-        <circle cx="120" cy="38" r="14" fill={PRIMARY}/>
-        <path d="M114 38 L118 42 L126 34" stroke="white" strokeWidth="2.2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-        <rect x="60" y="60" width="120" height="6" rx="1" fill={SECONDARY}/>
-        <rect x="80" y="72" width="80"  height="3" rx="1" fill={FAINT}/>
-        <rect x="86" y="80" width="68"  height="3" rx="1" fill={FAINT}/>
+        {Chrome}
+        {/* big check circle with soft halo */}
+        <circle cx="120" cy="42" r="18" fill="rgba(66,193,104,0.10)"/>
+        <circle cx="120" cy="42" r="13" fill="rgba(66,193,104,0.85)"/>
+        <path d="M114 42 L118 46 L126 38" stroke="white" strokeWidth="2.2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+        <rect x="60" y="68" width="120" height="6" rx="1" fill={SECONDARY}/>
+        <rect x="80" y="80" width="80"  height="2.5" rx="1" fill={FAINT}/>
+        <rect x="86" y="86" width="68"  height="2.5" rx="1" fill={FAINT}/>
       </>
     ),
     upsell: (
       <>
-        <rect x="6" y="4"  width="60"  height="6"  rx="1" fill={SECONDARY}/>
+        {Chrome}
         <rect x="20" y="22" width="180" height="12" rx="2" fill={PRIMARY}/>
-        <rect x="20" y="44" width="60"  height="20" rx="2" fill={SECONDARY}/>
-        <rect x="86" y="48" width="80"  height="4"  rx="1" fill={FAINT}/>
-        <rect x="86" y="56" width="100" height="4"  rx="1" fill={FAINT}/>
-        <rect x="20" y="74" width="100" height="14" rx="3" fill={SOLID}/>
+        {/* product image + description */}
+        <rect x="20" y="44" width="60"  height="38" rx="2" fill={FAINT} stroke={BORDER} strokeWidth="0.5"/>
+        <rect x="86" y="48" width="80"  height="3"  rx="1" fill={SECONDARY}/>
+        <rect x="86" y="56" width="100" height="2.5" rx="1" fill={FAINT}/>
+        <rect x="86" y="62" width="90"  height="2.5" rx="1" fill={FAINT}/>
+        <rect x="86" y="74" width="100" height="11" rx="3" fill={SOLID}/>
       </>
     ),
     webinar: (
       <>
-        <rect x="6" y="4"  width="60"  height="6"  rx="1" fill={SECONDARY}/>
-        <rect x="20" y="22" width="200" height="48" rx="3" fill={PRIMARY}/>
-        <polygon points="110,38 110,56 128,47" fill="white"/>
-        <rect x="20" y="76" width="120" height="4" rx="1" fill={SECONDARY}/>
-        <rect x="20" y="84" width="80"  height="3" rx="1" fill={FAINT}/>
+        {Chrome}
+        {/* video player frame with play button + faux progress bar */}
+        <rect x="20" y="22" width="200" height="46" rx="3" fill={PRIMARY}/>
+        <circle cx="120" cy="45" r="11" fill="rgba(255,255,255,0.12)"/>
+        <polygon points="115,40 115,50 124,45" fill="white"/>
+        <rect x="24" y="62" width="192" height="2" rx="1" fill="rgba(255,255,255,0.18)"/>
+        <rect x="24" y="62" width="58" height="2" rx="1" fill="white"/>
+        <rect x="20" y="74" width="120" height="4" rx="1" fill={SECONDARY}/>
+        <rect x="20" y="82" width="80"  height="2.5" rx="1" fill={FAINT}/>
       </>
     ),
     membership: (
       <>
-        <rect x="6" y="4"  width="60"  height="6"  rx="1" fill={SECONDARY}/>
-        <circle cx="34" cy="36" r="10" fill={SECONDARY}/>
-        <rect x="50" y="30" width="80" height="5" rx="1" fill={SECONDARY}/>
-        <rect x="50" y="40" width="60" height="3" rx="1" fill={FAINT}/>
-        <rect x="20" y="56" width="92" height="32" rx="2" fill={FAINT}/>
-        <rect x="120" y="56" width="92" height="32" rx="2" fill={FAINT}/>
+        {Chrome}
+        {/* avatar + welcome */}
+        <circle cx="34" cy="32" r="10" fill={SECONDARY}/>
+        <rect x="50" y="26" width="80" height="5" rx="1" fill={SECONDARY}/>
+        <rect x="50" y="35" width="60" height="3" rx="1" fill={FAINT}/>
+        {/* 2 module cards */}
+        <rect x="20" y="50" width="92" height="36" rx="2" fill="white" stroke={BORDER} strokeWidth="0.8"/>
+        <rect x="120" y="50" width="92" height="36" rx="2" fill="white" stroke={BORDER} strokeWidth="0.8"/>
+        <rect x="26" y="54" width="80" height="14" rx="2" fill={FAINT}/>
+        <rect x="26" y="72" width="50" height="3" rx="1" fill={SECONDARY}/>
+        <rect x="26" y="78" width="60" height="2.5" rx="1" fill={FAINT}/>
+        <rect x="126" y="54" width="80" height="14" rx="2" fill={FAINT}/>
+        <rect x="126" y="72" width="50" height="3" rx="1" fill={SECONDARY}/>
+        <rect x="126" y="78" width="60" height="2.5" rx="1" fill={FAINT}/>
       </>
     ),
     custom: (
       <>
-        <rect x="6" y="4"  width="60"  height="6"  rx="1" fill={SECONDARY}/>
-        <rect x="20" y="22" width="200" height="6"  rx="1" fill={FAINT}/>
-        <rect x="20" y="36" width="200" height="6"  rx="1" fill={FAINT}/>
-        <rect x="20" y="50" width="200" height="6"  rx="1" fill={FAINT}/>
-        <rect x="20" y="64" width="120" height="6"  rx="1" fill={FAINT}/>
+        {Chrome}
+        {/* generic block layout — 3 wide bars + a smaller one, suggests content */}
+        <rect x="20" y="24" width="200" height="10" rx="2" fill={PRIMARY}/>
+        <rect x="20" y="40" width="200" height="3"  rx="1" fill={FAINT}/>
+        <rect x="20" y="48" width="180" height="3"  rx="1" fill={FAINT}/>
+        <rect x="20" y="56" width="200" height="3"  rx="1" fill={FAINT}/>
+        <rect x="20" y="64" width="120" height="3"  rx="1" fill={FAINT}/>
+        <rect x="20" y="76" width="60"  height="12" rx="3" fill={SOLID}/>
       </>
     ),
   };
@@ -2467,7 +2526,13 @@ function EdgeOverlays({ nodes, edges, zoom, hovered, onHover, onRemove, onInsert
         const isHovered = hovered === i;
         const stroke = getEdgeStroke(e, isHovered);
         const vol = e.volume || 0;
-        const fromVisitors = a.type === 'source' ? (a.data.visitorsNum || 1) : null;
+        /* Compute conversion rate using parent's visitor count regardless
+           of node type. Sources expose .visitorsNum; pages expose .visitors.
+           This eliminates the placeholder dash that used to show on
+           page→page edges where rate was forced to null. */
+        const fromVisitors = a.type === 'source'
+          ? (a.data.visitorsNum || null)
+          : (a.data.visitors || null);
         const rate = fromVisitors ? Math.round((vol / fromVisitors) * 100) : null;
         const showInteractive = isHovered && mode === 'build';
         const showStats = mode === 'analyse' && vol > 0;
@@ -2505,13 +2570,14 @@ function EdgeOverlays({ nodes, edges, zoom, hovered, onHover, onRemove, onInsert
                Hover state: subtle background tint + shadow lift + tiny TrendingUp
                icon fades in on the right as a click affordance. */}
             {showStats && (() => {
-              const pct = rate != null ? `${rate}%` : '—';
+              const hasRate = rate != null;
+              const pct = hasRate ? `${rate}%` : null;
               const uniques = formatVolume(vol);
               const cy = geo.my + (hasLabel ? 14 : 0) + pillOffsetY;
               const isOpen = statsOpen === i;
               // Pill dimensions — wider for breathing room, slightly rounded corners
               const pillW = 112;
-              const pillH = 44;
+              const pillH = hasRate ? 44 : 30; // slimmer when only one line of content
               return (
                 <g key={`pill-${i}`} transform={`translate(${geo.mx}, ${cy})`} style={{ pointerEvents: 'auto' }}>
                   <foreignObject x={-pillW/2} y={-pillH/2} width={pillW} height={pillH} style={{ overflow: 'visible' }}>
@@ -2549,22 +2615,24 @@ function EdgeOverlays({ nodes, edges, zoom, hovered, onHover, onRemove, onInsert
                         e.currentTarget.style.boxShadow = '0 1px 3px rgba(15,23,42,0.08)';
                         e.currentTarget.style.transform = 'translateY(0)';
                       }}>
-                      {/* line 1 — bold % */}
-                      <span style={{
-                        fontSize: 13,
-                        fontWeight: 700,
-                        color: '#0F172A',
-                        fontFamily: 'ui-sans-serif, system-ui, sans-serif',
-                        lineHeight: 1,
-                      }}>
-                        {pct}
-                      </span>
+                      {/* line 1 — bold % (hidden when no rate available, e.g. no parent visitor data) */}
+                      {hasRate && (
+                        <span style={{
+                          fontSize: 13,
+                          fontWeight: 700,
+                          color: '#0F172A',
+                          fontFamily: 'ui-sans-serif, system-ui, sans-serif',
+                          lineHeight: 1,
+                        }}>
+                          {pct}
+                        </span>
+                      )}
                       {/* line 2 — unique count + label, with people icon */}
                       <span style={{
                         display: 'flex',
                         alignItems: 'center',
                         gap: 3,
-                        marginTop: 4,
+                        marginTop: hasRate ? 4 : 0,
                         lineHeight: 1,
                       }}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 11, height: 11, color: '#006CB5' }}>
@@ -3352,7 +3420,10 @@ function Canvas({ mode, demoState, onDemoStateChange, onJumpToTemplates, onJumpT
        H_GAP bumped from 100 → 180 so the mid-edge stat pill (and any future
        collision-resolution offsets) always has comfortable breathing room
        between connected cards. */
-    const H_GAP = 180;
+    /* H_GAP=130 (was 180 during orthogonal experiment) — bezier curves don't
+       need wide stubs to fit pills, so 130 is enough breathing room without
+       wasting horizontal canvas space. Pill (112px) + ~9px each side margin. */
+    const H_GAP = 130;
     const V_GAP = 60;
     const LEFT_START = 100;
     const TOP_START = 200;
@@ -4783,8 +4854,15 @@ function InspectorSettings({ node, api }) {
 
 /* ── Inspector primitives — small reusable bits ── */
 function InspSection({ label, right, children }) {
+  /* Adds a top border + padding so each Inspector section reads as a
+     distinct block (Performance, Details, Ad tracking, Traffic snapshot,
+     Actions, etc.). The first-of-type variant strips the top border so the
+     panel doesn't open with a redundant divider line — handled via CSS
+     `.insp-section:first-of-type { border-top: 0; padding-top: 0; }` (see
+     index.css). The fallback class names below give Tailwind the right rule
+     for everything from the second section onward. */
   return (
-    <div>
+    <div className="insp-section pt-4 mt-4 border-t border-line-soft">
       <div className="flex items-center justify-between mb-2">
         <div className="text-[10px] font-semibold uppercase tracking-wider text-ink-soft" style={{ letterSpacing: '0.07em' }}>{label}</div>
         {right}

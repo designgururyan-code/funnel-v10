@@ -413,3 +413,12 @@ button > * > *,
 [class*="hover:opacity-"]:not(input):not(textarea):not(select) {
   cursor: pointer !important;
 }
+
+/* Inspector section separators — the first section in any panel doesn't
+   need a top border (the panel header is enough). Subsequent sections get
+   a border-top + extra top padding (set inline via Tailwind in InspSection). */
+.insp-section:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+  margin-top: 0;
+}
