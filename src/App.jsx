@@ -2388,7 +2388,7 @@ function EdgeOverlays({ nodes, edges, zoom, hovered, onHover, onRemove, onInsert
 
     // Collision detection — only matters in Analyse mode where pills render.
     if (mode === 'analyse') {
-      const PROX_X = 80, PROX_Y = 28, NUDGE = 22;
+      const PROX_X = 120, PROX_Y = 50, NUDGE = 32;
       for (let i = 0; i < list.length; i++) {
         const a = list[i];
         const ax = a.geo.mx, ay = a.geo.my + (a.hasLabel ? 14 : 0) + a.pillOffsetY;
@@ -2445,52 +2445,81 @@ function EdgeOverlays({ nodes, edges, zoom, hovered, onHover, onRemove, onInsert
                       style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}>{labelStr}</text>
               </g>
             )}
-            {/* Mid-edge pill — stacked content INSIDE one cohesive white pill.
-               The % sits as the headline (bold, top), the unique count + label
-               sit below (smaller, secondary). Green stats button hangs off the
-               right edge as an overlapping attachment, like a notification dot.
-               `pillOffsetY` from collision pass shifts pills vertically when
-               neighbors are too close. */}
+            {/* Mid-edge stat pill — slightly-rounded rectangle (not fully-rounded),
+               proper internal padding. The ENTIRE pill is the click target —
+               clicking opens the path-stats popover. No separate green button.
+               Hover state: subtle background tint + shadow lift + tiny TrendingUp
+               icon fades in on the right as a click affordance. */}
             {showStats && (() => {
               const pct = rate != null ? `${rate}%` : '—';
               const uniques = formatVolume(vol);
               const cy = geo.my + (hasLabel ? 14 : 0) + pillOffsetY;
               const isOpen = statsOpen === i;
-              // Pill dimensions — wide enough for the longer of the two lines
-              const pillW = 96;
-              const pillH = 38;
+              // Pill dimensions — wider for breathing room, slightly rounded corners
+              const pillW = 112;
+              const pillH = 44;
               return (
                 <g key={`pill-${i}`} transform={`translate(${geo.mx}, ${cy})`} style={{ pointerEvents: 'auto' }}>
-                  {/* white pill container — rounded, soft shadow, 1px border */}
-                  <rect x={-pillW/2} y={-pillH/2} width={pillW} height={pillH} rx={pillH/2}
-                        fill="white" stroke="#E5E7EB" strokeWidth="1"
-                        style={{ filter: 'drop-shadow(0 1px 3px rgba(15,23,42,0.08))', pointerEvents: 'none' }}/>
-                  {/* line 1 — bold % headline */}
-                  <text x="0" y="-3" textAnchor="middle" fontSize="13" fontWeight="700" fill="#0F172A"
-                        style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif', pointerEvents: 'none' }}>
-                    {pct}
-                  </text>
-                  {/* line 2 — unique count with people icon */}
-                  <foreignObject x={-pillW/2} y="2" width={pillW} height="16" style={{ overflow: 'visible' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px', height: '16px', pointerEvents: 'none' }}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '11px', height: '11px', color: '#006CB5' }}>
-                        <UsersIcon size={10}/>
+                  <foreignObject x={-pillW/2} y={-pillH/2} width={pillW} height={pillH} style={{ overflow: 'visible' }}>
+                    <button
+                      onClick={(ev) => { ev.stopPropagation(); setStatsOpen(isOpen ? null : i); }}
+                      title="View path stats"
+                      className="group/pill"
+                      style={{
+                        width: pillW,
+                        height: pillH,
+                        background: isOpen ? '#F8FAFC' : 'white',
+                        border: '1px solid #E5E7EB',
+                        borderRadius: 8,
+                        boxShadow: isOpen
+                          ? '0 4px 10px rgba(15,23,42,0.10)'
+                          : '0 1px 3px rgba(15,23,42,0.08)',
+                        padding: '6px 12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        transition: 'background 140ms ease, box-shadow 140ms ease, transform 140ms ease',
+                        position: 'relative',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (isOpen) return;
+                        e.currentTarget.style.background = '#F8FAFC';
+                        e.currentTarget.style.boxShadow = '0 3px 8px rgba(15,23,42,0.10)';
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (isOpen) return;
+                        e.currentTarget.style.background = 'white';
+                        e.currentTarget.style.boxShadow = '0 1px 3px rgba(15,23,42,0.08)';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }}>
+                      {/* line 1 — bold % */}
+                      <span style={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: '#0F172A',
+                        fontFamily: 'ui-sans-serif, system-ui, sans-serif',
+                        lineHeight: 1,
+                      }}>
+                        {pct}
                       </span>
-                      <span style={{ fontSize: '10.5px', fontWeight: 700, color: '#006CB5', fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}>{uniques}</span>
-                      <span style={{ fontSize: '9.5px', fontWeight: 500, color: '#94A3B8', letterSpacing: '0.04em' }}>UNIQUE</span>
-                    </div>
-                  </foreignObject>
-                  {/* green stats button — overlapping attachment, sits half-outside
-                     the pill on the right edge like a notification badge */}
-                  <foreignObject x={pillW/2 - 11} y="-11" width="22" height="22" style={{ overflow: 'visible' }}>
-                    <div style={{ width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <button onClick={(ev) => { ev.stopPropagation(); setStatsOpen(isOpen ? null : i); }}
-                        title="Path stats"
-                        className="w-[20px] h-[20px] inline-flex items-center justify-center rounded-full bg-good text-white hover:bg-good-deep transition-colors"
-                        style={{ boxShadow: '0 0 0 2px white, 0 1px 3px rgba(15,23,42,0.18)' }}>
-                        <TrendingUp size={11}/>
-                      </button>
-                    </div>
+                      {/* line 2 — unique count + label, with people icon */}
+                      <span style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 3,
+                        marginTop: 4,
+                        lineHeight: 1,
+                      }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 11, height: 11, color: '#006CB5' }}>
+                          <UsersIcon size={10}/>
+                        </span>
+                        <span style={{ fontSize: 10.5, fontWeight: 700, color: '#006CB5', fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}>{uniques}</span>
+                        <span style={{ fontSize: 9.5, fontWeight: 500, color: '#94A3B8', letterSpacing: '0.04em' }}>UNIQUE</span>
+                      </span>
+                    </button>
                   </foreignObject>
                 </g>
               );
@@ -3272,8 +3301,10 @@ function Canvas({ mode, demoState, onDemoStateChange, onJumpToTemplates, onJumpT
     });
 
     /* Step 3 — assign positions. Column x = leftStart + col * (maxColWidth + hGap).
-       Rows within column stacked at vGap, then vertically centered around 0. */
-    const H_GAP = 100;
+       H_GAP bumped from 100 → 180 so the mid-edge stat pill (and any future
+       collision-resolution offsets) always has comfortable breathing room
+       between connected cards. */
+    const H_GAP = 180;
     const V_GAP = 60;
     const LEFT_START = 100;
     const TOP_START = 200;
