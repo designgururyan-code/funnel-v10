@@ -4978,7 +4978,7 @@ function InspectorEmpty({ funnel, canvasNodes = [], mode = "build" }) {
   const [range, setRange]       = useState('7d');
   const [view,  setView]        = useState('basic'); // 'basic' | 'advanced'
   const [customRangeOpen, setCustomRangeOpen] = useState(false);
-  const [activityOpen, setActivityOpen] = useState(true);
+  const [activityOpen, setActivityOpen] = useState(false);
 
   // Detect what's actually in the funnel — drives whether Advanced is unlockable.
   const pricedPages = useMemo(
