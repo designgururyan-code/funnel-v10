@@ -1109,14 +1109,8 @@ function Sidebar({ onAIClick, onBuildAIClick, collapsed, onToggleCollapsed, focu
           onClick={() => canvasApi?.current?.addNode({ type:'page',   data:{ title:'New page', path:'/new', pageType:'landing', kind:'landing' } })}/>
         <QuickIcon Icon={Cart}     color="#0891B2" tint="#E0F7FA" tintHover="#B2EBF2" label="Add checkout"
           onClick={() => canvasApi?.current?.addNode({ type:'page',   data:{ title:'Checkout', path:'/checkout', pageType:'checkout', kind:'checkout' } })}/>
-        {/* Divider — separates page-creation from flow-logic */}
-        <div className="w-px h-5 bg-line-soft mx-0.5"/>
-        {/* Logic cluster — A/B test = orange to read as "test/experiment",
-            Condition = violet to read as "logic/branch". */}
-        <QuickIcon Icon={Bars}     color="#F59E0B" tint="#FEF3C7" tintHover="#FDE68A" label="Add A/B test"
-          onClick={() => canvasApi?.current?.addNode({ type:'logic', data:{ kind:'abtest', title:'A/B Test', split:50 } })}/>
-        <QuickIcon Icon={Workflow} color="#7C3AED" tint="#F3EEFF" tintHover="#E9DEFF" label="Add condition"
-          onClick={() => canvasApi?.current?.addNode({ type:'logic', data:{ kind:'condition', title:'Condition' } })}/>
+        {/* A/B Test and Condition removed from Quick Add — logic nodes are
+           created from a connecting line's quick action, not via this menu. */}
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto scroll-thin">
@@ -1158,6 +1152,10 @@ function Sidebar({ onAIClick, onBuildAIClick, collapsed, onToggleCollapsed, focu
                 onClick={() => {
                   setActivePage(p.id);
                   canvasApi?.current?.panToNodeByTitle(p.title);
+                }}
+                onRemove={() => {
+                  canvasApi?.current?.removeNodeByTitle(p.title);
+                  if (activePage === p.id) setActivePage(null);
                 }}
                 onContextMenu={(e) => onPageContext(e, p, 'in-funnel')}/>
             )}
@@ -1266,7 +1264,7 @@ function FolderRow({ folder, onClick }) {
   );
 }
 
-function PageRow({ page, inFunnel, draggable=true, active=false, isInFunnel=false, onClick, onContextMenu }) {
+function PageRow({ page, inFunnel, draggable=true, active=false, isInFunnel=false, onClick, onContextMenu, onRemove }) {
   const t = PAGE_TYPE[page.type] || PAGE_TYPE.custom;
   const TIcon = t.Icon;
   const cursorClass = draggable ? 'cursor-grab' : 'cursor-pointer';
@@ -1330,7 +1328,7 @@ function PageRow({ page, inFunnel, draggable=true, active=false, isInFunnel=fals
         <Chip kind={page.status === 'live' ? 'live' : 'draft'} sm>{page.status === 'live' ? 'Live' : 'Draft'}</Chip>
         {inFunnel && (
           <Tip label="Remove from funnel" side="top">
-            <button onClick={(e) => e.stopPropagation()}
+            <button onClick={(e) => { e.stopPropagation(); onRemove && onRemove(); }}
               className="row-action w-5 h-5 inline-flex items-center justify-center rounded hover:bg-bad-soft text-ink-soft hover:text-bad-deep transition-colors">
               <X size={12}/>
             </button>
@@ -2088,15 +2086,37 @@ function LogicNode({ node, selected, onSelect, onDragStart, onConnectStart, onRe
         </div>
       </div>
 
-      {/* single output dot — right middle. Two clicks-and-drags create the two branches.
-         Branch identity is determined at connect-start time by the canvas (counting
-         existing outgoing edges from this node), not encoded in the dot itself.
-         Hover-only visibility — matches source/page card pattern for visual consistency. */}
-      <ConnectorDot
-        side="right"
-        nodeId={node.id}
-        onConnectStart={onConnectStart}
-        color={VIOLET} hidden={readonly}/>
+      {/* Single output dot — INLINE pixel-explicit positioning. Tailwind
+         arbitrary values (right-0, top-1/2) had reliability issues so we use
+         inline styles directly. The dot sits half-outside the right edge,
+         vertically centered on the card. Always visible (not hover-gated)
+         because branching is the whole point of this card type. */}
+      {!readonly && (() => {
+        const ringRGB = hexToRGB(VIOLET);
+        return (
+          <span
+            data-connector-dot
+            title="Drag to connect a branch"
+            onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); onConnectStart(node.id, 'right', e); }}
+            style={{
+              position: 'absolute',
+              top: '50%',
+              right: '-8px',
+              transform: 'translateY(-50%)',
+              width: '16px',
+              height: '16px',
+              borderRadius: '9999px',
+              background: VIOLET,
+              boxShadow: `0 0 0 3px rgba(255,255,255,1), 0 0 0 5px rgba(${ringRGB},0.32), 0 2px 6px rgba(0,0,0,0.20)`,
+              cursor: 'crosshair',
+              zIndex: 30,
+              transition: 'transform 150ms cubic-bezier(0.32, 0.72, 0, 1)',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-50%) scale(1.35)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(-50%) scale(1)'; }}
+          />
+        );
+      })()}
     </div>
   );
 }
@@ -2433,98 +2453,9 @@ function EdgeOverlays({ nodes, edges, zoom, hovered, onHover, onRemove, onInsert
                       </button>
                     </div>
                   </foreignObject>
-                  {/* popover anchored under the button */}
-                  {isOpen && (() => {
-                    const e2 = edges[i];
-                    const fromNode = nodes.find(n => n.id === e2?.from);
-                    const toNode   = nodes.find(n => n.id === e2?.to);
-                    const fromTitle = fromNode?.data?.title || (fromNode?.type === 'source' ? (SOURCES.find(ss => ss.id === fromNode?.data?.src)?.name || 'Source') : 'From');
-                    const toTitle   = toNode?.data?.title   || 'To';
-                    const conv = vol ? Math.round((vol / Math.max(1, fromNode?.data?.visitorsNum || fromNode?.data?.visitors || 100)) * 100) : 0;
-                    const drop = Math.max(0, 100 - conv);
-                    return (
-                      <foreignObject x={-130} y={18} width={260} height={300} style={{ overflow: 'visible' }}>
-                        <div onClick={(ev) => ev.stopPropagation()}
-                          className="ctx-menu w-[260px] bg-white rounded-lg shadow-menu overflow-hidden">
-                          {/* Light green muted heading — readable, not heavy */}
-                          <div className="px-3 py-2.5 bg-good-soft border-b border-good/30 flex items-center gap-2">
-                            <span className="w-5 h-5 rounded-full bg-good text-white inline-flex items-center justify-center shrink-0">
-                              <TrendingUp size={10}/>
-                            </span>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-[10px] uppercase tracking-wider text-good-deep font-semibold">Path stats</div>
-                              <div className="text-[12px] font-semibold leading-tight truncate text-ink mt-0.5">
-                                {fromTitle} <span className="text-ink-soft">→</span> {toTitle}
-                              </div>
-                            </div>
-                            <button onClick={() => setStatsOpen(null)}
-                              className="w-5 h-5 inline-flex items-center justify-center rounded hover:bg-white/60 transition-colors text-good-deep">
-                              <X size={11}/>
-                            </button>
-                          </div>
-                          {/* Stats body — coloured icons + tinted values for a
-                             scannable, varied look (was monochrome). Smaller numbers. */}
-                          <div className="p-3 grid grid-cols-2 gap-2">
-                            <div className="flex items-start gap-1.5 min-w-0">
-                              <span className="w-4 h-4 rounded inline-flex items-center justify-center mt-0.5 shrink-0" style={{ background: '#E6F0F9', color: '#006CB5' }}>
-                                <Eye size={9}/>
-                              </span>
-                              <div className="min-w-0">
-                                <div className="text-[9.5px] uppercase tracking-wider text-ink-soft">Visitors</div>
-                                <div className="text-[12.5px] font-semibold tabular-nums leading-tight" style={{ color: '#006CB5' }}>{vol.toLocaleString()}</div>
-                              </div>
-                            </div>
-                            <div className="flex items-start gap-1.5 min-w-0">
-                              <span className="w-4 h-4 rounded inline-flex items-center justify-center mt-0.5 shrink-0" style={{ background: '#ECFDF5', color: '#10B981' }}>
-                                <TrendingUp size={9}/>
-                              </span>
-                              <div className="min-w-0">
-                                <div className="text-[9.5px] uppercase tracking-wider text-ink-soft">Conversion</div>
-                                <div className="text-[12.5px] font-semibold text-good-deep tabular-nums leading-tight">{conv}%</div>
-                              </div>
-                            </div>
-                            <div className="flex items-start gap-1.5 min-w-0">
-                              <span className="w-4 h-4 rounded inline-flex items-center justify-center mt-0.5 shrink-0" style={{ background: '#FEE2E2', color: '#DC2626' }}>
-                                <Activity size={9}/>
-                              </span>
-                              <div className="min-w-0">
-                                <div className="text-[9.5px] uppercase tracking-wider text-ink-soft">Drop-off</div>
-                                <div className="text-[12.5px] font-semibold text-bad-deep tabular-nums leading-tight">{drop}%</div>
-                              </div>
-                            </div>
-                            <div className="flex items-start gap-1.5 min-w-0">
-                              <span className="w-4 h-4 rounded inline-flex items-center justify-center mt-0.5 shrink-0" style={{ background: '#F3EEFF', color: '#7C3AED' }}>
-                                <Eye size={9}/>
-                              </span>
-                              <div className="min-w-0">
-                                <div className="text-[9.5px] uppercase tracking-wider text-ink-soft">Time-to-next</div>
-                                <div className="text-[12.5px] font-semibold tabular-nums leading-tight" style={{ color: '#7C3AED' }}>0:42</div>
-                              </div>
-                            </div>
-                          </div>
-                          {/* Quick actions — covers most of edge-selection value
-                             without the user needing to leave the canvas. */}
-                          <div className="px-3 py-2 bg-surface-sub border-t border-line-soft flex items-center gap-1">
-                            <button title="Add condition"
-                              className="flex-1 h-7 inline-flex items-center justify-center gap-1 text-[10.5px] font-semibold text-ink-muted bg-white border border-line rounded hover:border-violet hover:text-violet transition-colors">
-                              <Workflow size={10}/> Condition
-                            </button>
-                            <button title="Add A/B split"
-                              className="flex-1 h-7 inline-flex items-center justify-center gap-1 text-[10.5px] font-semibold text-ink-muted bg-white border border-line rounded hover:border-warn hover:text-warn-deep transition-colors">
-                              <Bars size={10}/> A/B
-                            </button>
-                            <button title="Disconnect"
-                              className="h-7 px-2 inline-flex items-center justify-center text-[10.5px] font-semibold text-ink-muted bg-white border border-line rounded hover:border-bad hover:text-bad-deep transition-colors">
-                              <X size={10}/>
-                            </button>
-                          </div>
-                          <div className="px-3 py-1.5 bg-surface-sub border-t border-line-soft text-[10px] text-ink-soft leading-snug">
-                            From last 7 days. Drop-off = visitors who didn't reach the next step.
-                          </div>
-                        </div>
-                      </foreignObject>
-                    );
-                  })()}
+                  {/* popover moved out of this edge's <g> so it renders LAST
+                     in the SVG, above any other edge's pills/badges. See
+                     "open popover overlay" block below the edges.map(). */}
                 </g>
               );
             })()}
@@ -2542,6 +2473,106 @@ function EdgeOverlays({ nodes, edges, zoom, hovered, onHover, onRemove, onInsert
           </g>
         );
       })}
+      {/* OPEN POPOVER OVERLAY — rendered last in the SVG so it stacks on top
+         of every other edge's pills/badges/arrows. Only one popover is open
+         at a time (statsOpen is a single index). Translates to the open
+         edge's midpoint and renders the full popover via foreignObject. */}
+      {statsOpen != null && (() => {
+        const e2 = edges[statsOpen];
+        if (!e2) return null;
+        const a = nodes.find(n => n.id === e2.from);
+        const b = nodes.find(n => n.id === e2.to);
+        if (!a || !b) return null;
+        const geo = computeEdgeGeometry(a, b, nodes, mode, e2);
+        const hasLabel = !!e2.label;
+        const cy = geo.my + (hasLabel ? 14 : 0);
+        const vol = e2.volume || 0;
+        const fromNode = a;
+        const toNode = b;
+        const fromTitle = fromNode?.data?.title || (fromNode?.type === 'source' ? (SOURCES.find(ss => ss.id === fromNode?.data?.src)?.name || 'Source') : 'From');
+        const toTitle   = toNode?.data?.title   || 'To';
+        const conv = vol ? Math.round((vol / Math.max(1, fromNode?.data?.visitorsNum || fromNode?.data?.visitors || 100)) * 100) : 0;
+        const drop = Math.max(0, 100 - conv);
+        return (
+          <g transform={`translate(${geo.mx}, ${cy})`} style={{ pointerEvents: 'auto' }}>
+            <foreignObject x={-130} y={18} width={260} height={300} style={{ overflow: 'visible' }}>
+              <div onClick={(ev) => ev.stopPropagation()}
+                className="ctx-menu w-[260px] bg-white rounded-lg shadow-menu overflow-hidden">
+                <div className="px-3 py-2.5 bg-good-soft border-b border-good/30 flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-good text-white inline-flex items-center justify-center shrink-0">
+                    <TrendingUp size={10}/>
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[10px] uppercase tracking-wider text-good-deep font-semibold">Path stats</div>
+                    <div className="text-[12px] font-semibold leading-tight truncate text-ink mt-0.5">
+                      {fromTitle} <span className="text-ink-soft">→</span> {toTitle}
+                    </div>
+                  </div>
+                  <button onClick={() => setStatsOpen(null)}
+                    className="w-5 h-5 inline-flex items-center justify-center rounded hover:bg-white/60 transition-colors text-good-deep">
+                    <X size={11}/>
+                  </button>
+                </div>
+                <div className="p-3 grid grid-cols-2 gap-2">
+                  <div className="flex items-start gap-1.5 min-w-0">
+                    <span className="w-4 h-4 rounded inline-flex items-center justify-center mt-0.5 shrink-0" style={{ background: '#E6F0F9', color: '#006CB5' }}>
+                      <Eye size={9}/>
+                    </span>
+                    <div className="min-w-0">
+                      <div className="text-[9.5px] uppercase tracking-wider text-ink-soft">Visitors</div>
+                      <div className="text-[12.5px] font-semibold tabular-nums leading-tight" style={{ color: '#006CB5' }}>{vol.toLocaleString()}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-1.5 min-w-0">
+                    <span className="w-4 h-4 rounded inline-flex items-center justify-center mt-0.5 shrink-0" style={{ background: '#ECFDF5', color: '#10B981' }}>
+                      <TrendingUp size={9}/>
+                    </span>
+                    <div className="min-w-0">
+                      <div className="text-[9.5px] uppercase tracking-wider text-ink-soft">Conversion</div>
+                      <div className="text-[12.5px] font-semibold text-good-deep tabular-nums leading-tight">{conv}%</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-1.5 min-w-0">
+                    <span className="w-4 h-4 rounded inline-flex items-center justify-center mt-0.5 shrink-0" style={{ background: '#FEE2E2', color: '#DC2626' }}>
+                      <Activity size={9}/>
+                    </span>
+                    <div className="min-w-0">
+                      <div className="text-[9.5px] uppercase tracking-wider text-ink-soft">Drop-off</div>
+                      <div className="text-[12.5px] font-semibold text-bad-deep tabular-nums leading-tight">{drop}%</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-1.5 min-w-0">
+                    <span className="w-4 h-4 rounded inline-flex items-center justify-center mt-0.5 shrink-0" style={{ background: '#F3EEFF', color: '#7C3AED' }}>
+                      <Eye size={9}/>
+                    </span>
+                    <div className="min-w-0">
+                      <div className="text-[9.5px] uppercase tracking-wider text-ink-soft">Time-to-next</div>
+                      <div className="text-[12.5px] font-semibold tabular-nums leading-tight" style={{ color: '#7C3AED' }}>0:42</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="px-3 py-2 bg-surface-sub border-t border-line-soft flex items-center gap-1">
+                  <button title="Add condition"
+                    className="flex-1 h-7 inline-flex items-center justify-center gap-1 text-[10.5px] font-semibold text-ink-muted bg-white border border-line rounded hover:border-violet hover:text-violet transition-colors">
+                    <Workflow size={10}/> Condition
+                  </button>
+                  <button title="Add A/B split"
+                    className="flex-1 h-7 inline-flex items-center justify-center gap-1 text-[10.5px] font-semibold text-ink-muted bg-white border border-line rounded hover:border-warn hover:text-warn-deep transition-colors">
+                    <Bars size={10}/> A/B
+                  </button>
+                  <button title="Disconnect"
+                    className="h-7 px-2 inline-flex items-center justify-center text-[10.5px] font-semibold text-ink-muted bg-white border border-line rounded hover:border-bad hover:text-bad-deep transition-colors">
+                    <X size={10}/>
+                  </button>
+                </div>
+                <div className="px-3 py-1.5 bg-surface-sub border-t border-line-soft text-[10px] text-ink-soft leading-snug">
+                  From last 7 days. Drop-off = visitors who didn't reach the next step.
+                </div>
+              </div>
+            </foreignObject>
+          </g>
+        );
+      })()}
     </svg>
   );
 }
@@ -2840,6 +2871,7 @@ function Canvas({ mode, demoState, onDemoStateChange, onJumpToTemplates, onJumpT
         });
       },
       getNodes: () => nodes,
+      getOutgoingEdges: (nodeId) => edges.filter(e => e.from === nodeId),
       panToNodeByTitle: (title) => {
         const match = nodes.find(n => n.data && n.data.title === title);
         if (!match) return;
@@ -3705,7 +3737,7 @@ function InspectorTabs({ tab, onTabChange }) {
 function InspectorDetails({ node, api, mode }) {
   if (node.type === 'page')   return <DetailsPage node={node} api={api} mode={mode}/>;
   if (node.type === 'source') return <DetailsSource node={node} api={api} mode={mode}/>;
-  if (node.type === 'logic')  return <DetailsLogic node={node} api={api}/>;
+  if (node.type === 'logic')  return <DetailsLogic node={node} api={api} mode={mode}/>;
   return null;
 }
 
@@ -3856,11 +3888,24 @@ function DetailsSource({ node, api, mode }) {
 }
 
 /* LOGIC DETAILS — Condition rule builder OR A/B Test split slider */
-function DetailsLogic({ node, api }) {
+function DetailsLogic({ node, api, mode }) {
   const isAB = node.data.kind === 'abtest';
   const yLabel = node.data.yesLabel != null ? node.data.yesLabel : (isAB ? 'Variant A' : 'If condition is true');
   const nLabel = node.data.noLabel  != null ? node.data.noLabel  : (isAB ? 'Variant B' : 'If condition is false');
   const title  = node.data.title    != null ? node.data.title    : (isAB ? 'Untitled A/B test' : 'Untitled condition');
+
+  // Pull live edge data for this logic node so the Performance section reflects
+  // the actual visitor split rather than mocked numbers. Only used in Analyse mode.
+  const showPerformance = mode === 'analyse';
+  const outEdges = (showPerformance && api.getOutgoingEdges) ? api.getOutgoingEdges(node.id) : [];
+  const primaryEdge   = outEdges.find(e => e.branch === (isAB ? 'a' : 'yes')) || outEdges[0];
+  const secondaryEdge = outEdges.find(e => e.branch === (isAB ? 'b' : 'no'))  || outEdges[1];
+  const yVol = primaryEdge?.volume   || 0;
+  const nVol = secondaryEdge?.volume || 0;
+  const total = yVol + nVol;
+  const yPct = total ? Math.round((yVol / total) * 100) : 0;
+  const nPct = total ? Math.round((nVol / total) * 100) : 0;
+
   return (
     <div className="px-4 py-3 space-y-4">
       <InspSection label={isAB ? 'Test name' : 'Condition name'}>
@@ -3868,6 +3913,49 @@ function DetailsLogic({ node, api }) {
           placeholder={isAB ? 'Untitled A/B test' : 'Untitled condition'}
           className="w-full h-7 px-2 text-[11.5px] text-ink bg-surface-sub border border-line-soft rounded outline-none focus:border-brand"/>
       </InspSection>
+
+      {/* Performance — Analyse mode only. Build mode users are wiring things up;
+         performance data is irrelevant until the funnel is live. */}
+      {showPerformance && (
+        <InspSection label="Performance">
+        {total === 0 ? (
+          <div className="px-2.5 py-2 bg-surface-sub border border-line-soft rounded-md">
+            <div className="text-[11.5px] text-ink-muted">No traffic yet</div>
+            <div className="text-[10.5px] text-ink-soft mt-0.5 leading-snug">Connect both branches and run traffic to see the split.</div>
+          </div>
+        ) : (
+          <>
+            {/* Two stat cards side-by-side */}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-white border border-line-soft rounded-md px-2.5 py-2">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="w-4 h-4 rounded-full inline-flex items-center justify-center text-[9px] font-bold text-white shrink-0"
+                    style={{ background: isAB ? '#7C3AED' : '#10B981' }}>{isAB ? 'A' : 'Y'}</span>
+                  <span className="text-[10px] uppercase tracking-wider text-ink-soft truncate">{isAB ? 'Variant A' : 'Yes'}</span>
+                </div>
+                <div className="text-[14px] font-semibold tabular-nums leading-none" style={{ color: isAB ? '#7C3AED' : '#10B981' }}>{yPct}%</div>
+                <div className="text-[10px] text-ink-soft tabular-nums mt-1">{yVol.toLocaleString()} visitors</div>
+              </div>
+              <div className="bg-white border border-line-soft rounded-md px-2.5 py-2">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="w-4 h-4 rounded-full inline-flex items-center justify-center text-[9px] font-bold text-white shrink-0"
+                    style={{ background: isAB ? '#F59E0B' : '#94A3B8' }}>{isAB ? 'B' : 'N'}</span>
+                  <span className="text-[10px] uppercase tracking-wider text-ink-soft truncate">{isAB ? 'Variant B' : 'No'}</span>
+                </div>
+                <div className="text-[14px] font-semibold tabular-nums leading-none" style={{ color: isAB ? '#F59E0B' : '#94A3B8' }}>{nPct}%</div>
+                <div className="text-[10px] text-ink-soft tabular-nums mt-1">{nVol.toLocaleString()} visitors</div>
+              </div>
+            </div>
+            {/* Stacked bar — visualises the split as one continuous element */}
+            <div className="mt-2 h-2 rounded-full bg-surface-muted overflow-hidden flex">
+              <div style={{ width: yPct + '%', background: isAB ? '#7C3AED' : '#10B981' }}/>
+              <div style={{ width: nPct + '%', background: isAB ? '#F59E0B' : '#94A3B8' }}/>
+            </div>
+            <div className="mt-1.5 text-[10.5px] text-ink-soft tabular-nums">{total.toLocaleString()} total visitors · last 7 days</div>
+          </>
+        )}
+      </InspSection>
+      )}
 
       {!isAB && <ConditionRuleBuilder node={node} api={api}/>}
       {isAB  && <ABTestSplitSlider node={node} api={api}/>}
@@ -4446,7 +4534,14 @@ function InspectorSettings({ node, api }) {
               ))}
             </div>
           </Field>
-          <Field label="Page image">
+        </InspSection>
+      )}
+
+      {/* Page image — available for ALL page types, not just custom. Image
+         appears on the canvas card preview area when set. */}
+      {isPage && (
+        <InspSection label="Page image">
+          <Field label="Preview">
             {node.data.screenshot ? (
               <div className="space-y-1.5">
                 <div className="relative rounded-md overflow-hidden border border-line-soft bg-surface-sub">
@@ -4475,7 +4570,7 @@ function InspectorSettings({ node, api }) {
                 <div className="text-[10px] text-ink-soft mt-0.5">PNG, JPG up to 5MB</div>
               </label>
             )}
-            <p className="text-[10px] text-ink-soft leading-snug mt-1">Or paste a URL above. Leave empty for wireframe.</p>
+            <p className="text-[10px] text-ink-soft leading-snug mt-1">Or paste a URL above. Leave empty for a wireframe placeholder.</p>
           </Field>
         </InspSection>
       )}
