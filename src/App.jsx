@@ -2115,16 +2115,16 @@ function LogicNode({ node, selected, onSelect, onDragStart, onConnectStart, onRe
 
 /* getFloatingAnchor — given a node and a "look toward" point, returns the side
    anchor + outward-direction unit vector for that side. */
-function getFloatingAnchor(node, towardX, towardY, mode) {
+function getFloatingAnchor(node, towardX, towardY, mode, isOutgoing) {
   const w = NODE_W[node.type];
   const h = getNodeH(node, mode);
   const cx = node.x + w / 2;
   const cy = node.y + h / 2;
-  /* Logic nodes: outgoing edges always anchor at right-middle (where the
+  /* Logic nodes: OUTGOING edges always anchor at right-middle (where the
      connector dot sits) so Y and N branches share a visible origin point.
-     The branch-emergence offset on cy1 in computeEdgeGeometry visually fans
-     the two branches apart from this same anchor. */
-  if (node.type === 'logic') {
+     Incoming edges still use normal floating-anchor logic so they don't
+     all pile onto the right side. */
+  if (node.type === 'logic' && isOutgoing) {
     return { x: node.x + w, y: cy, ox: 1, oy: 0 };
   }
   const dx = towardX - cx;
@@ -2161,13 +2161,13 @@ function computeEdgeGeometry(a, b, allNodes, mode, edge) {
      Output: path string + sx/sy/ex/ey, control points cx1/cy1/cx2/cy2, midpoint
      mx/my (t=0.5), badge anchor bx/by (t=0.85), arrow tangent ang. */
 
-  /* anchors */
+  /* anchors — `a` is source (outgoing), `b` is destination (incoming) */
   const bCx = b.x + NODE_W[b.type] / 2;
   const bCy = b.y + getNodeH(b, mode) / 2;
-  const aA = getFloatingAnchor(a, bCx, bCy, mode);
+  const aA = getFloatingAnchor(a, bCx, bCy, mode, true);
   const aCx = a.x + NODE_W[a.type] / 2;
   const aCy = a.y + getNodeH(a, mode) / 2;
-  const bA = getFloatingAnchor(b, aCx, aCy, mode);
+  const bA = getFloatingAnchor(b, aCx, aCy, mode, false);
 
   const sx = aA.x, sy = aA.y;
   const ex = bA.x, ey = bA.y;
@@ -2373,22 +2373,55 @@ function EdgeBranchBadge({ x, y, branch }) {
 function EdgeOverlays({ nodes, edges, zoom, hovered, onHover, onRemove, onInsert, mode }) {
   const [statsOpen, setStatsOpen] = useState(null); // edge index whose stats popover is open
   const showArrow = zoom > 0.5;
+
+  // Precompute geometry for every edge so we can detect pill collisions before
+  // rendering. Pills (Analyse mode) sit at (geo.mx, geo.my + labelOffset). When
+  // two pills sit within 28px both horizontally AND vertically of each other,
+  // we shift one up and one down by 22px so they stack visibly instead of
+  // overlapping. Greedy linear pass — good enough for typical funnel sizes.
+  const edgeGeos = useMemo(() => {
+    const list = edges.map((e, i) => {
+      const a = nodes.find(n => n.id === e.from);
+      const b = nodes.find(n => n.id === e.to);
+      if (!a || !b) return null;
+      const geo = computeEdgeGeometry(a, b, nodes, mode, e);
+      const labelStr = (e.label || '').trim();
+      const hasLabel = labelStr.length > 1; // filter empty, whitespace, single-char placeholders
+      return { i, edge: e, a, b, geo, hasLabel, pillOffsetY: 0 };
+    }).filter(Boolean);
+
+    // Collision detection — only matters in Analyse mode where pills render.
+    if (mode === 'analyse') {
+      const PROX_X = 80, PROX_Y = 28, NUDGE = 22;
+      for (let i = 0; i < list.length; i++) {
+        const a = list[i];
+        const ax = a.geo.mx, ay = a.geo.my + (a.hasLabel ? 14 : 0) + a.pillOffsetY;
+        for (let j = i + 1; j < list.length; j++) {
+          const b = list[j];
+          const bx = b.geo.mx, by = b.geo.my + (b.hasLabel ? 14 : 0) + b.pillOffsetY;
+          if (Math.abs(ax - bx) < PROX_X && Math.abs(ay - by) < PROX_Y) {
+            // Push the lower-Y pill up, the higher-Y pill down. If equal, pick by index.
+            if (ay <= by) { a.pillOffsetY -= NUDGE; b.pillOffsetY += NUDGE; }
+            else          { a.pillOffsetY += NUDGE; b.pillOffsetY -= NUDGE; }
+          }
+        }
+      }
+    }
+    return list;
+  }, [edges, nodes, mode]);
+
   return (
     <svg className="absolute inset-0 overflow-visible"
          style={{ width: '100%', height: '100%', left: 0, top: 0, pointerEvents: 'none' }}>
-      {edges.map((e, i) => {
-        const a = nodes.find(n => n.id === e.from);
-        const b = nodes.find(n => n.id === e.to);
-        if (!a || !b) return null;
-        const geo = computeEdgeGeometry(a, b, nodes, mode, e);
+      {edgeGeos.map(({ i, edge: e, a, b, geo, hasLabel, pillOffsetY }) => {
         const isHovered = hovered === i;
         const stroke = getEdgeStroke(e, isHovered);
         const vol = e.volume || 0;
         const fromVisitors = a.type === 'source' ? (a.data.visitorsNum || 1) : null;
         const rate = fromVisitors ? Math.round((vol / fromVisitors) * 100) : null;
-        const hasLabel = !!e.label;
         const showInteractive = isHovered && mode === 'build';
         const showStats = mode === 'analyse' && vol > 0;
+        const labelStr = (e.label || '').trim();
 
         return (
           <g key={i}>
@@ -2405,26 +2438,24 @@ function EdgeOverlays({ nodes, edges, zoom, hovered, onHover, onRemove, onInsert
             {/* persistent branch badge — Y/N/A/B circle near destination */}
             {e.branch && <EdgeBranchBadge x={geo.bx} y={geo.by} branch={e.branch}/>}
 
-            {/* edge text label (e.g. "showed up") */}
+            {/* edge text label (e.g. "showed up") — sits 14px above the pill,
+               so when the pill is shifted to avoid collisions, the label
+               follows it. Only renders for substantive labels (>1 char). */}
             {hasLabel && (
-              <g transform={`translate(${geo.mx}, ${geo.my - 14})`} style={{ pointerEvents: 'none' }}>
-                <rect x={-(e.label.length * 3.2 + 8)} y="-9" width={e.label.length * 6.4 + 16} height="18" rx="9"
+              <g transform={`translate(${geo.mx}, ${geo.my + pillOffsetY - 14})`} style={{ pointerEvents: 'none' }}>
+                <rect x={-(labelStr.length * 3.2 + 8)} y="-9" width={labelStr.length * 6.4 + 16} height="18" rx="9"
                       fill="white" stroke="#E5E7EB" strokeWidth="1"/>
                 <text textAnchor="middle" y="4" fontSize="10.5" fill="#475569" fontWeight="500"
-                      style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}>{e.label}</text>
+                      style={{ fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}>{labelStr}</text>
               </g>
             )}
-            {/* Mid-edge pill — stacked layout per client feedback:
-                 ┌─────────────┐
-                 │    100%     │  ← bold %, large
-                 │ 👤 2 UNIQUE │  ← people icon + count below
-                 └─────────────┘
-               Plus an embedded green stats button still hangs off the right
-               for jumping into the path-stats popover. */}
+            {/* Mid-edge pill — stacked layout per client feedback. The
+               `pillOffsetY` from the precomputation pass shifts pills
+               vertically when neighbors collide. */}
             {showStats && (() => {
               const pct = rate != null ? `${rate}%` : '—';
               const uniques = formatVolume(vol);
-              const cy = geo.my + (hasLabel ? 14 : 0);
+              const cy = geo.my + (hasLabel ? 14 : 0) + pillOffsetY;
               const isOpen = statsOpen === i;
               return (
                 <g key={`pill-${i}`} transform={`translate(${geo.mx}, ${cy})`} style={{ pointerEvents: 'auto' }}>
@@ -2460,7 +2491,7 @@ function EdgeOverlays({ nodes, edges, zoom, hovered, onHover, onRemove, onInsert
                 plus an Analyse-only stats button + popover sibling */}
             {showInteractive && (<>
               <EdgeChip
-                x={geo.mx} y={geo.my + (hasLabel ? 14 : 0)}
+                x={geo.mx} y={geo.my + (hasLabel ? 14 : 0) + pillOffsetY}
                 onHover={() => onHover(i)}
                 onInsert={() => onInsert(i, geo.mx, geo.my)}
                 onRemove={() => onRemove(i)}/>
@@ -2475,14 +2506,10 @@ function EdgeOverlays({ nodes, edges, zoom, hovered, onHover, onRemove, onInsert
          at a time (statsOpen is a single index). Translates to the open
          edge's midpoint and renders the full popover via foreignObject. */}
       {statsOpen != null && (() => {
-        const e2 = edges[statsOpen];
-        if (!e2) return null;
-        const a = nodes.find(n => n.id === e2.from);
-        const b = nodes.find(n => n.id === e2.to);
-        if (!a || !b) return null;
-        const geo = computeEdgeGeometry(a, b, nodes, mode, e2);
-        const hasLabel = !!e2.label;
-        const cy = geo.my + (hasLabel ? 14 : 0);
+        const geoData = edgeGeos.find(g => g.i === statsOpen);
+        if (!geoData) return null;
+        const { edge: e2, a, b, geo, hasLabel, pillOffsetY } = geoData;
+        const cy = geo.my + (hasLabel ? 14 : 0) + pillOffsetY;
         const vol = e2.volume || 0;
         const fromNode = a;
         const toNode = b;
