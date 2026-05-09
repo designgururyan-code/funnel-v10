@@ -2104,6 +2104,13 @@ function LogicNode({ node, selected, onSelect, onDragStart, onConnectStart, onRe
          lets Tailwind's top-1/2 finally compute correctly here. */}
       <ConnectorDot side="right" nodeId={node.id} onConnectStart={onConnectStart}
         color={VIOLET} alwaysVisible hidden={readonly}/>
+      {/* Input dot — left-middle, marks where incoming connections land.
+         Also draggable as a connection source so users can wire from this
+         card backwards to an upstream node if they want. Always visible
+         (matches right output's alwaysVisible) so the input affordance is
+         as discoverable as the output. */}
+      <ConnectorDot side="left" nodeId={node.id} onConnectStart={onConnectStart}
+        color={VIOLET} alwaysVisible hidden={readonly}/>
     </div>
   );
 }
@@ -2387,8 +2394,45 @@ function EdgeOverlays({ nodes, edges, zoom, hovered, onHover, onRemove, onInsert
     }).filter(Boolean);
 
     // Collision detection — only matters in Analyse mode where pills render.
+    // Two passes:
+    //   Pass 1: pill-vs-card. If the pill rect (112×44) at midpoint overlaps
+    //           any non-endpoint card, shift it up or down (whichever has
+    //           more clearance) until clear.
+    //   Pass 2: pill-vs-pill. If two pills sit too close, push them apart.
     if (mode === 'analyse') {
-      const PROX_X = 120, PROX_Y = 50, NUDGE = 32;
+      const PILL_W = 112, PILL_H = 44, CARD_PAD = 14;
+      // Pass 1 — pill vs card
+      list.forEach(item => {
+        const tryClear = () => {
+          const px = item.geo.mx, py = item.geo.my + (item.hasLabel ? 14 : 0) + item.pillOffsetY;
+          for (const n of nodes) {
+            if (n.id === item.a.id || n.id === item.b.id) continue;
+            const nw = NODE_W[n.type], nh = getNodeH(n, mode);
+            const overlaps =
+              px + PILL_W/2 + CARD_PAD > n.x &&
+              px - PILL_W/2 - CARD_PAD < n.x + nw &&
+              py + PILL_H/2 + CARD_PAD > n.y &&
+              py - PILL_H/2 - CARD_PAD < n.y + nh;
+            if (overlaps) {
+              // Decide direction — push toward the side with more open space
+              const distAbove = py - n.y;
+              const distBelow = (n.y + nh) - py;
+              if (distAbove < distBelow) {
+                item.pillOffsetY -= (distAbove + PILL_H/2 + CARD_PAD + 4);
+              } else {
+                item.pillOffsetY += (distBelow + PILL_H/2 + CARD_PAD + 4);
+              }
+              return true;
+            }
+          }
+          return false;
+        };
+        // Try up to 3 nudges in case the new position lands on another card
+        for (let pass = 0; pass < 3 && tryClear(); pass++) { /* iterate */ }
+      });
+
+      // Pass 2 — pill vs pill
+      const PROX_X = 130, PROX_Y = 56, NUDGE = 36;
       for (let i = 0; i < list.length; i++) {
         const a = list[i];
         const ax = a.geo.mx, ay = a.geo.my + (a.hasLabel ? 14 : 0) + a.pillOffsetY;
@@ -2396,7 +2440,6 @@ function EdgeOverlays({ nodes, edges, zoom, hovered, onHover, onRemove, onInsert
           const b = list[j];
           const bx = b.geo.mx, by = b.geo.my + (b.hasLabel ? 14 : 0) + b.pillOffsetY;
           if (Math.abs(ax - bx) < PROX_X && Math.abs(ay - by) < PROX_Y) {
-            // Push the lower-Y pill up, the higher-Y pill down. If equal, pick by index.
             if (ay <= by) { a.pillOffsetY -= NUDGE; b.pillOffsetY += NUDGE; }
             else          { a.pillOffsetY += NUDGE; b.pillOffsetY -= NUDGE; }
           }
@@ -2612,18 +2655,10 @@ function EdgeOverlays({ nodes, edges, zoom, hovered, onHover, onRemove, onInsert
                     </div>
                   </div>
                 </div>
-                <div className="px-3 py-2 bg-surface-sub border-t border-line-soft flex items-center gap-1">
-                  <button title="Add condition"
-                    className="flex-1 h-7 inline-flex items-center justify-center gap-1 text-[10.5px] font-semibold text-ink-muted bg-white border border-line rounded hover:border-violet hover:text-violet transition-colors">
-                    <Workflow size={10}/> Condition
-                  </button>
-                  <button title="Add A/B split"
-                    className="flex-1 h-7 inline-flex items-center justify-center gap-1 text-[10.5px] font-semibold text-ink-muted bg-white border border-line rounded hover:border-warn hover:text-warn-deep transition-colors">
-                    <Bars size={10}/> A/B
-                  </button>
-                  <button title="Disconnect"
-                    className="h-7 px-2 inline-flex items-center justify-center text-[10.5px] font-semibold text-ink-muted bg-white border border-line rounded hover:border-bad hover:text-bad-deep transition-colors">
-                    <X size={10}/>
+                <div className="px-3 py-2 bg-surface-sub border-t border-line-soft">
+                  <button title="Disconnect this path"
+                    className="w-full h-7 inline-flex items-center justify-center gap-1.5 text-[10.5px] font-semibold text-ink-muted bg-white border border-line rounded hover:border-bad hover:text-bad-deep transition-colors">
+                    <X size={11}/> Disconnect
                   </button>
                 </div>
                 <div className="px-3 py-1.5 bg-surface-sub border-t border-line-soft text-[10px] text-ink-soft leading-snug">
@@ -3873,18 +3908,26 @@ function DetailsPage({ node, api, mode }) {
               const name = isCustomSrc ? (c.node.data.customName || 'Custom') : (sourceData?.name || 'Source');
               const color = isCustomSrc ? (c.node.data.customColor || '#475569') : (sourceData?.color || '#475569');
               const pct = total ? Math.round((c.vol / total) * 100) : 0;
+              // Styling matches the Stat component used by Performance:
+              // py-1, ink-soft label, ink-strong tabular-nums value. Source name
+              // gets a small dot prefix in the source's brand color.
               return (
-                <div key={c.id} className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-surface-sub transition-colors">
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }}/>
-                  <span className="text-[12px] font-medium text-ink truncate flex-1">{name}</span>
-                  <span className="text-[11px] text-ink-soft tabular-nums">{c.vol.toLocaleString()} unique</span>
-                  <span className="text-[11px] font-semibold tabular-nums w-9 text-right" style={{ color }}>{pct}%</span>
+                <div key={c.id} className="flex items-center justify-between py-1 gap-2 min-w-0">
+                  <span className="flex items-center gap-1.5 min-w-0 flex-1">
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }}/>
+                    <span className="text-[11.5px] text-ink-soft truncate">{name}</span>
+                  </span>
+                  <span className="flex items-center gap-2 tabular-nums">
+                    <span className="text-[11px] text-ink-soft">{c.vol.toLocaleString()}</span>
+                    <span className="text-[12.5px] font-semibold w-9 text-right" style={{ color }}>{pct}%</span>
+                  </span>
                 </div>
               );
             })}
-            <div className="mt-1 pt-1.5 border-t border-line-soft flex items-center justify-between px-2">
-              <span className="text-[10.5px] text-ink-soft">Total</span>
-              <span className="text-[11px] font-semibold tabular-nums text-ink">{total.toLocaleString()} unique</span>
+            {/* Total — uses the same Stat styling pattern (label/value pair) */}
+            <div className="flex items-center justify-between py-1 pt-2 mt-1 border-t border-line-soft">
+              <span className="text-[11.5px] text-ink-soft">Total</span>
+              <span className="text-[12.5px] font-semibold tabular-nums text-ink">{total.toLocaleString()}</span>
             </div>
           </InspSection>
         );
